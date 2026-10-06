@@ -8,7 +8,7 @@ export default async function handler(req,res){
  if(!process.env.SUPABASE_URL||!process.env.SUPABASE_SERVICE_ROLE_KEY)return res.status(500).json({error:"Storage is not configured"});
  try{
   const body=req.method==="POST"?req.body||{}:{};
-  const workspace=String(body.workspace_id||"").trim(),id=String(body.giveaway_id||"").trim();
+  const workspace=String((req.query&&req.query.workspace_id)||body.workspace_id||"").trim(),id=String((req.query&&req.query.giveaway_id)||body.giveaway_id||"").trim();
   if(!workspace||!id)return res.status(400).json({error:"workspace_id and giveaway_id are required"});
   if(req.method==="GET"){
    const g=await sb("giveaways?id=eq."+encodeURIComponent(id)+"&workspace_id=eq."+encodeURIComponent(workspace)+"&select=*");
