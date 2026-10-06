@@ -58,11 +58,34 @@ const T={en:{title:"Giveaway dashboard",subtitle:"One place for participants, we
 de:{title:"Giveaway-Dashboard",importTitle:"Kommentar-/Chat-Import",onePerUser:"Ein Eintrag pro Benutzer",importComments:"Einträge importieren",importHint:"Format: Benutzer: Kommentar, Benutzer — Kommentar oder ein Benutzer pro Zeile.",roundStatus:"Status",subtitle:"Teilnehmer, gewichtete Tickets und Gewinner an einem Ort.",connection:"Plattform-Verbindung",connect:"Twitch verbinden",disconnect:"Trennen",giveaway:"Gewinnspiel",new:"Neues Gewinnspiel",participants:"Teilnehmer",tickets:"Tickets gesamt",rounds:"Ziehungen",add:"Hinzufügen",addList:"Liste hinzufügen",clear:"Leeren",user:"Benutzer",role:"Rolle",weight:"Gewicht",settings:"Ziehungs-Einstellungen",ticketCommand:"Twitch-Ticket-Befehl",winnerCount:"Anzahl Gewinner",exclude:"Frühere Gewinner ausschließen",draw:"Gewinner ziehen",history:"Verlauf"},
 ru:{title:"Панель розыгрыша",importTitle:"Импорт комментариев / чата",onePerUser:"Один участник на пользователя",importComments:"Импортировать участников",importHint:"Формат: username: комментарий, username — комментарий или один username в строке.",roundStatus:"Статус",subtitle:"Участники, веса билетов и победители в одном месте.",connection:"Подключение платформы",connect:"Подключить Twitch",disconnect:"Отключить",giveaway:"Розыгрыш",new:"Новый розыгрыш",participants:"Участники",tickets:"Всего билетов",rounds:"Розыгрыши",add:"Добавить",addList:"Добавить список",clear:"Очистить",user:"Пользователь",role:"Роль",weight:"Вес",settings:"Настройки выбора",ticketCommand:"Команда билета Twitch",winnerCount:"Количество победителей",exclude:"Исключать прошлых победителей",draw:"Выбрать победителя",history:"История"}};
 let state=JSON.parse(localStorage.getItem("winnerPicker")||"null")||{platform:"Twitch",name:"",status:"open",people:[],history:[],settings:{Viewer:1,"Tier 1":2,"Tier 2":5,"Tier 3":10,ticketCommand:"!ticket"}};
+state.workspaceId=state.workspaceId||crypto.randomUUID();
+state.giveawayId=state.giveawayId||crypto.randomUUID();
+let remoteReady=false,remoteTimer=null;
 let lang=localStorage.getItem("winnerLang")||"en";let ws=null;let twitch={token:sessionStorage.getItem("wp_twitch_token")||"",user:null,subs:{}};
 const $=id=>document.getElementById(id);
 function log(s){$("twitchLog").textContent+=new Date().toLocaleTimeString()+"  "+s+"\n";$("twitchLog").scrollTop=$("twitchLog").scrollHeight}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-function save(){localStorage.setItem("winnerPicker",JSON.stringify(state));render()}
+function save(){localStorage.setItem("winnerPicker",JSON.stringify(state));render();queueRemoteSave()}
+function queueRemoteSave(){
+ if(!remoteReady)return;
+ clearTimeout(remoteTimer);remoteTimer=setTimeout(async()=>{try{
+  await fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"save_giveaway",workspace_id:state.workspaceId,giveaway_id:state.giveawayId,name:state.name,platform:state.platform,status:state.status,settings:state.settings})});
+  await fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"replace_participants",workspace_id:state.workspaceId,giveaway_id:state.giveawayId,participants:state.people.map(p=>({key:p.key||p.name,name:p.name,role:p.role,weight:p.weight}))})});
+ }catch(e){console.warn("Remote storage:",e.message)}},1200);
+}
+async function loadRemote(){
+ try{
+  const r=await fetch("/api/storage?workspace_id="+encodeURIComponent(state.workspaceId)+"&giveaway_id="+encodeURIComponent(state.giveawayId));
+  if(!r.ok)return;const d=await r.json();
+  if(d.giveaway){
+   state.name=d.giveaway.name||state.name;state.platform=d.giveaway.platform||state.platform;state.status=d.giveaway.status||state.status;
+   state.settings={...state.settings,...(d.giveaway.settings||{})};
+   state.people=(d.participants||[]).map(p=>({name:p.name,role:p.role,weight:p.weight,key:p.participant_key}));
+   state.history=(d.draws||[]).map(x=>({platform:x.platform,winners:x.winners,time:x.created_at}));
+  }
+  remoteReady=true;localStorage.setItem("winnerPicker",JSON.stringify(state));render();
+ }catch(e){remoteReady=false;console.warn("Remote storage unavailable:",e.message)}
+}
 function setLang(x){lang=x;localStorage.setItem("winnerLang",x);render()}
 function saveSettings(){const ids=["wViewer","wTier1","wTier2","wTier3"];["Viewer","Tier 1","Tier 2","Tier 3"].forEach((r,i)=>{const el=$(ids[i]);if(el)state.settings[r]=Math.max(1,+el.value||1)});state.settings.ticketCommand=$("ticketCommand").value.trim()||"!ticket";save()}
 function render(){
@@ -257,7 +280,7 @@ function removePerson(i){state.people.splice(i,1);save()}
 function clearParticipants(){if(confirm("Clear all participants?")){state.people=[];save()}}
 function secureRandom(){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296}
 function weightedPick(arr){let total=arr.reduce((s,p)=>s+p.weight,0),r=secureRandom()*total;for(const p of arr){r-=p.weight;if(r<0)return p}return arr[arr.length-1]}
-function draw(){if(!state.people.length){$("result").innerHTML='<div class="result"><span class="muted">No participants.</span></div>';return}let n=Math.max(1,+$("winnerCount").value||1),used=new Set($("exclude").checked?state.history.flatMap(h=>h.winners):[]),pool=state.people.filter(p=>!used.has(p.name)),w=[];while(pool.length&&w.length<n){let p=weightedPick(pool);w.push(p.name);pool.splice(pool.indexOf(p),1)}if(!w.length){$("result").innerHTML='<div class="result"><span class="muted">No eligible participants.</span></div>';return}state.history.push({name:state.name||"Untitled giveaway",platform:state.platform,winners:w,time:Date.now()});localStorage.setItem("winnerPicker",JSON.stringify(state));$("result").innerHTML='<div class="result"><div class="muted">'+state.platform+'</div><strong>'+w.map(esc).join("<br>")+"</strong></div>";render()}
+function draw(){if(!state.people.length){$("result").innerHTML='<div class="result"><span class="muted">No participants.</span></div>';return}let n=Math.max(1,+$("winnerCount").value||1),used=new Set($("exclude").checked?state.history.flatMap(h=>h.winners):[]),pool=state.people.filter(p=>!used.has(p.name)),w=[];while(pool.length&&w.length<n){let p=weightedPick(pool);w.push(p.name);pool.splice(pool.indexOf(p),1)}if(!w.length){$("result").innerHTML='<div class="result"><span class="muted">No eligible participants.</span></div>';return}state.history.push({name:state.name||"Untitled giveaway",platform:state.platform,winners:w,time:Date.now()});localStorage.setItem("winnerPicker",JSON.stringify(state));if(remoteReady)fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"save_draw",workspace_id:state.workspaceId,giveaway_id:state.giveawayId,platform:state.platform,winners:w})}).catch(()=>{});$("result").innerHTML='<div class="result"><div class="muted">'+state.platform+'</div><strong>'+w.map(esc).join("<br>")+"</strong></div>";render()}
 function exportData(){let b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="winner-picker.json";a.click();URL.revokeObjectURL(a.href)}
 function importData(){let i=document.createElement("input");i.type="file";i.accept=".json,application/json";i.onchange=()=>{let f=i.files[0],r=new FileReader();r.onload=()=>{try{state=JSON.parse(r.result);save()}catch(e){alert("Invalid file")}};r.readAsText(f)};i.click()}
 function redirectUri(){return location.origin+location.pathname}
@@ -285,5 +308,6 @@ if(!state.people.some(p=>p.name.toLowerCase()===ev.chatter_user_name.toLowerCase
 function disconnectTwitch(){if(ytTimer)clearTimeout(ytTimer);if(ws)try{ws.close()}catch(e){}ws=null;twitch={token:"",user:null,subs:{}};sessionStorage.removeItem("wp_twitch_token");render();log("Disconnected")}
 finishTwitch().then(()=>finishYouTubeOAuth()).then(()=>render());
 render();
+finishTwitch().then(()=>finishYouTubeOAuth()).then(()=>finishInstagramOAuth()).then(()=>{render();loadRemote()});
 </script>
 </body></html>
