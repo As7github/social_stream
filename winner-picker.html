@@ -304,10 +304,8 @@ ws.onerror=()=>log("EventSub WebSocket error");ws.onclose=()=>log("EventSub WebS
 async function handleChat(ev){
 let cmd=(state.settings.ticketCommand||"!ticket").toLowerCase();if((ev.message.text||"").trim().toLowerCase().split(/\s+/)[0]!==cmd)return;
 let role="Viewer",weight=state.settings.Viewer||1;try{let q="https://api.twitch.tv/helix/subscriptions?broadcaster_id="+encodeURIComponent(twitch.user.id)+"&user_id="+encodeURIComponent(ev.chatter_user_id);let d=await twitchFetch(q);if(d.data&&d.data[0]){let tier=d.data[0].tier;role=tier==="3000"?"Tier 3":tier==="2000"?"Tier 2":"Tier 1";weight=state.settings[role]||weight}}catch(e){log("Tier lookup failed for "+ev.chatter_user_name+": "+e.message)}
-if(!state.people.some(p=>p.name.toLowerCase()===ev.chatter_user_name.toLowerCase())){state.people.push({name:ev.chatter_user_name,role,weight});localStorage.setItem("winnerPicker",JSON.stringify(state));render();log("Ticket: "+ev.chatter_user_name+" ["+role+" ×"+weight+"]")}else log("Duplicate ticket ignored: "+ev.chatter_user_name)}
+if(!state.people.some(p=>p.name.toLowerCase()===ev.chatter_user_name.toLowerCase())){state.people.push({name:ev.chatter_user_name,role,weight});save();log("Ticket: "+ev.chatter_user_name+" ["+role+" ×"+weight+"]")}else log("Duplicate ticket ignored: "+ev.chatter_user_name)}
 function disconnectTwitch(){if(ytTimer)clearTimeout(ytTimer);if(ws)try{ws.close()}catch(e){}ws=null;twitch={token:"",user:null,subs:{}};sessionStorage.removeItem("wp_twitch_token");render();log("Disconnected")}
-finishTwitch().then(()=>finishYouTubeOAuth()).then(()=>render());
-render();
 finishTwitch().then(()=>finishYouTubeOAuth()).then(()=>finishInstagramOAuth()).then(()=>{render();loadRemote()});
 </script>
 </body></html>
