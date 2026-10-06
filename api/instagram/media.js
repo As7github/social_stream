@@ -1,5 +1,5 @@
 export default async function handler(req,res){
- const auth=req.headers.authorization||"";const token=auth.startsWith("Bearer ")?auth.slice(7):"";
+ const auth=req.headers.authorization||"";const cookies=Object.fromEntries((req.headers.cookie||"").split(";").map(x=>x.trim().split("=")).filter(x=>x.length===2).map(([k,...v])=>[k,decodeURIComponent(v.join("="))]));const token=auth.startsWith("Bearer ")?auth.slice(7):(cookies.ig_access_token||"");
  if(!token)return res.status(401).json({error:"Missing Instagram token"});
  const limit=Math.min(Number(req.query.limit||50),100);
  try{
