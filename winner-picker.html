@@ -123,16 +123,22 @@ $("platformConfig").innerHTML='<div class="row"><input id="clientId" class="inpu
 $("clientId").value=localStorage.getItem("wp_twitch_client_id")||"";
 $("platformNotice").innerHTML="<b>Twitch:</b> Live chat is collected with EventSub WebSocket. The authenticated broadcaster is used as the giveaway channel.";
 }else if(p==="YouTube"){
-$("platformConfig").innerHTML='<div class="row"><input id="igClientId" class="input grow" placeholder="Meta App ID"><button class="primary" onclick="connectInstagram()">Connect Instagram</button><button onclick="loadInstagramMedia()">Load publications</button></div><div class="row" style="margin-top:8px"><select id="igMediaList" class="input grow"><option value="">Load publications first</option></select><button onclick="loadInstagramComments()">Load comments</button></div><div class="row" style="margin-top:8px"><textarea id="igComments" class="input grow" style="min-height:70px" placeholder="Fallback: paste comments here"></textarea><button onclick="connectInstagramFallback()">Import manually</button></div>';
+$("platformConfig").innerHTML='<div class="row"><input id="ytClientId" class="input grow" placeholder="Google OAuth Client ID"><button class="primary" onclick="connectYouTubeOAuth()">Connect YouTube</button></div><div class="row" style="margin-top:8px"><input id="ytApiKey" class="input grow" placeholder="API key (optional fallback)"><input id="ytChatId" class="input grow" placeholder="Live chat ID (optional)"><button onclick="connectYouTube()">Use API key</button></div>';
 $("ytClientId").value=localStorage.getItem("wp_yt_client_id")||"";
 $("ytApiKey").value=localStorage.getItem("wp_yt_api_key")||"";
 $("ytChatId").value=localStorage.getItem("wp_yt_chat_id")||"";
-$("platformNotice").innerHTML="<b>YouTube:</b> live chat <code>!ticket</code> entries are collected automatically. Membership chat events are recognized as Member entries; exact membership-level mapping will be added after OAuth membership access is connected.";
+$("platformNotice").innerHTML="<b>YouTube:</b> live chat is collected in pages up to 2000 messages and continues with the API page token.";
+}else if(p==="Instagram"){
+$("platformConfig").innerHTML='<div class="row"><input id="igClientId" class="input grow" placeholder="Meta App ID"><button class="primary" onclick="connectInstagram()">Connect Instagram</button><button onclick="loadInstagramMedia()">Load publications</button></div><div class="row" style="margin-top:8px"><select id="igMediaList" class="input grow"><option value="">Load publications first</option></select><button onclick="loadInstagramComments()">Load comments</button></div><div class="row" style="margin-top:8px"><textarea id="igComments" class="input grow" style="min-height:70px" placeholder="Fallback: paste comments here"></textarea><button onclick="connectInstagramFallback()">Import manually</button></div>';
+$("igClientId").value=localStorage.getItem("wp_ig_client_id")||"";
+$("platformNotice").innerHTML="<b>Instagram:</b> comments are loaded page-by-page, so large posts are not limited to the first 100 comments.";
+}else if(p==="TikTok"){
+$("platformConfig").innerHTML='<div class="row"><input id="ttVideoId" class="input grow" placeholder="TikTok video ID"><button class="primary" onclick="loadTikTokComments()">Load comments</button></div><div class="row" style="margin-top:8px"><textarea id="ttComments" class="input grow" style="min-height:70px" placeholder="Fallback: paste/export TikTok comments here"></textarea><button onclick="importTikTokFallback()">Import manually</button></div>';
+$("platformNotice").innerHTML="<b>TikTok:</b> the official Research API supports paginated comment retrieval, but access requires TikTok Research Tools approval. If unavailable, use manual import.";
 }else{
-$("platformConfig").innerHTML='<div class="connection"><b>'+p+'</b><div class="small muted">Comment import is ready now. Follow verification is only enabled when the platform API provides a supported way to verify the participant.</div></div>';
-$("platformNotice").innerHTML="<b>"+p+":</b> comment import is ready. Duplicate filtering, keyword filtering and minimum-word filtering work locally.";
-}}
-let ytTimer=null,ytToken=sessionStorage.getItem("wp_yt_token")||"",ytChatId=sessionStorage.getItem("wp_yt_chat_id")||"",ytChannelId=sessionStorage.getItem("wp_yt_channel_id")||"";
+$("platformConfig").innerHTML='<div class="connection"><b>'+p+'</b></div>';
+$("platformNotice").textContent="";
+}}let ytTimer=null,ytToken=sessionStorage.getItem("wp_yt_token")||"",ytChatId=sessionStorage.getItem("wp_yt_chat_id")||"",ytChannelId=sessionStorage.getItem("wp_yt_channel_id")||"";
 function ytHeaders(){return ytToken?{Authorization:"Bearer "+ytToken}:{}} 
 async function ytFetch(url){let r=await fetch(url,{headers:ytHeaders()}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error?.message||("YouTube HTTP "+r.status));return d}
 function ytRedirect(){return location.origin+location.pathname}
@@ -213,6 +219,22 @@ async function finishInstagramOAuth(){
  log("Instagram authorization callback received.");
  state.platform="Instagram";save();render();
 }
+async function loadTikTokComments(){
+ const id=$("ttVideoId")?.value.trim();if(!id){log("Enter TikTok video ID.");return}
+ try{
+  let cursor=0,total=0,all=[];
+  while(true){
+   const r=await fetch("/api/tiktok/comments?video_id="+encodeURIComponent(id)+"&cursor="+cursor);const d=await r.json();
+   if(!r.ok)throw new Error(d.error||"TikTok API error");
+   const x=d.data||{};for(const m of (x.comments||[]))all.push((m.display_name||"user")+": "+(m.text||""));
+   total+=x.comments?.length||0;log("TikTok: loaded "+total+" comments...");
+   if(!x.has_more)break;cursor=x.cursor;if(total>=100000)break;
+  }
+  if(all.length)importComments(all.join("\n"),"TikTok");
+  log("TikTok complete: "+total+" comments loaded.");
+ }catch(e){log("TikTok comments error: "+e.message)}
+}
+function importTikTokFallback(){const raw=$("ttComments")?.value||"";if(raw.trim())importComments(raw,"TikTok")}
 function connectInstagramFallback(){
  const raw=$("igComments")?.value||"";if(!raw.trim())return;
  importComments(raw,"Instagram");
