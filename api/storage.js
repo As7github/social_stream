@@ -12,7 +12,8 @@ export default async function handler(req,res){
   if(!workspace||!id)return res.status(400).json({error:"workspace_id and giveaway_id are required"});
   if(req.method==="GET"){
    const g=await sb("giveaways?id=eq."+encodeURIComponent(id)+"&workspace_id=eq."+encodeURIComponent(workspace)+"&select=*");
-   const p=await sb("participants?giveaway_id=eq."+encodeURIComponent(id)+"&workspace_id=eq."+encodeURIComponent(workspace)+"&select=id,participant_key,name,role,weight&order=id.asc&limit=1000");
+   let p=[],offset=0;
+   while(true){const page=await sb("participants?giveaway_id=eq."+encodeURIComponent(id)+"&workspace_id=eq."+encodeURIComponent(workspace)+"&select=id,participant_key,name,role,weight&order=id.asc&limit=1000&offset="+offset);p.push(...page);if(page.length<1000)break;offset+=1000;if(offset>=100000)break}
    const d=await sb("draws?giveaway_id=eq."+encodeURIComponent(id)+"&workspace_id=eq."+encodeURIComponent(workspace)+"&select=platform,winners,created_at&order=id.asc&limit=1000");
    return res.status(200).json({giveaway:g[0]||null,participants:p,draws:d});
   }
