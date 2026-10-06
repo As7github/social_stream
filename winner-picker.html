@@ -92,7 +92,7 @@ $("platformConfig").innerHTML='<div class="row"><input id="clientId" class="inpu
 $("clientId").value=localStorage.getItem("wp_twitch_client_id")||"";
 $("platformNotice").innerHTML="<b>Twitch:</b> Live chat is collected with EventSub WebSocket. The authenticated broadcaster is used as the giveaway channel.";
 }else if(p==="YouTube"){
-$("platformConfig").innerHTML='<div class="row"><input id="ytClientId" class="input grow" placeholder="Google OAuth Client ID"><button class="primary" onclick="connectYouTubeOAuth()">Connect YouTube</button><button onclick="disconnectYouTube()">Disconnect</button></div><div class="row" style="margin-top:8px"><input id="ytApiKey" class="input grow" placeholder="API key (optional fallback)"><input id="ytChatId" class="input grow" placeholder="Live chat ID (optional)"><button onclick="connectYouTube()">Use API key</button></div>';
+$("platformConfig").innerHTML='<div class="row"><input id="igClientId" class="input grow" placeholder="Meta App ID"><button class="primary" onclick="connectInstagram()">Connect Instagram</button></div><div class="row" style="margin-top:8px"><textarea id="igComments" class="input grow" style="min-height:90px" placeholder="Fallback: paste comments here"></textarea><button onclick="connectInstagramFallback()">Import comments</button></div>';
 $("ytClientId").value=localStorage.getItem("wp_yt_client_id")||"";
 $("ytApiKey").value=localStorage.getItem("wp_yt_api_key")||"";
 $("ytChatId").value=localStorage.getItem("wp_yt_chat_id")||"";
@@ -133,6 +133,28 @@ async function initYouTubeOAuth(){
 async function connectYouTube(){
 const key=$("ytApiKey").value.trim(),chat=$("ytChatId").value.trim();if(!key||!chat){alert("Enter YouTube API key and Live Chat ID.");return}
 localStorage.setItem("wp_yt_api_key",key);localStorage.setItem("wp_yt_chat_id",chat);state.platform="YouTube";render();log("YouTube chat connected");pollYouTube(true);
+}
+async function connectInstagram(){
+ const client=$("igClientId")?.value.trim();
+ if(!client){alert("Enter Meta App ID first.");return}
+ localStorage.setItem("wp_ig_client_id",client);
+ const redirect=location.origin+location.pathname;
+ const state=Math.random().toString(36).slice(2);
+ sessionStorage.setItem("wp_ig_oauth_state",state);
+ const scope="instagram_business_basic,instagram_business_manage_comments";
+ location.href="https://www.instagram.com/oauth/authorize?client_id="+encodeURIComponent(client)+"&redirect_uri="+encodeURIComponent(redirect)+"&response_type=code&scope="+encodeURIComponent(scope)+"&state="+encodeURIComponent(state);
+}
+async function finishInstagramOAuth(){
+ const q=new URLSearchParams(location.search);const code=q.get("code"),state=q.get("state");
+ if(!code||!state||state!==sessionStorage.getItem("wp_ig_oauth_state"))return;
+ history.replaceState(null,"",location.pathname);
+ localStorage.setItem("wp_ig_code",code);
+ log("Instagram authorization received. Server token exchange is required before comments can be fetched.");
+ state.platform="Instagram";save();render();
+}
+function connectInstagramFallback(){
+ const raw=$("igComments")?.value||"";if(!raw.trim())return;
+ importComments(raw,"Instagram");
 }
 function disconnectYouTube(){if(ytTimer)clearTimeout(ytTimer);ytTimer=null;ytToken="";ytChatId="";ytChannelId="";sessionStorage.removeItem("wp_yt_token");sessionStorage.removeItem("wp_yt_chat_id");sessionStorage.removeItem("wp_yt_channel_id");log("YouTube disconnected")}
 async function pollYouTubeOAuth(first){
