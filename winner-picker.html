@@ -19,14 +19,21 @@ button,input,select{font:inherit}button{border:1px solid var(--line);background:
 <div class="card">
 <h2 data-t="connection">Platform connection</h2>
 <div id="connectionBox"></div>
-<div class="row"><input id="clientId" class="input grow" placeholder="Twitch Client ID"><button class="primary" onclick="connectTwitch()" data-t="connect">Connect Twitch</button><button onclick="disconnectTwitch()" data-t="disconnect">Disconnect</button></div>
-<div class="notice"><b>Twitch:</b> the site listens to chat with Twitch EventSub WebSocket. It uses a user OAuth token in this browser; no Client Secret is stored in the site. Twitch requires the exact current page URL to be registered as the OAuth redirect URL.</div>
+<div id="platformConfig"></div>
+<div class="notice" id="platformNotice"></div>
 <div id="twitchLog" class="log" style="margin-top:10px"></div>
+<div class="card" style="margin-top:12px;background:#0b1323">
+<h2 data-t="importTitle">Comment / chat import</h2>
+<div class="row"><textarea id="commentInput" class="input grow" rows="5" style="resize:vertical" placeholder="Paste comments or chat messages here — one per line"></textarea></div>
+<div class="row" style="margin-top:9px"><input id="keywordFilter" class="input" placeholder="Keyword (optional)"><input id="minWords" class="input" type="number" min="0" value="0" style="width:120px" placeholder="Min words"><label class="setting" style="flex:0 0 auto"><span data-t="onePerUser">One entry per user</span><input id="onePerUser" type="checkbox" checked></label><button class="primary" onclick="importComments()" data-t="importComments">Import entries</button></div>
+<div class="small muted" style="margin-top:7px" data-t="importHint">Format: username: comment, username — comment, or just one username per line.</div>
+</div>
 </div>
 <div class="card" style="margin-top:18px">
 <h2 data-t="giveaway">Giveaway</h2>
 <div class="row"><input id="giveawayName" class="input grow" placeholder="Giveaway name"><button class="primary" onclick="newGiveaway()" data-t="new">New giveaway</button></div>
 <div class="stats"><div class="stat"><b id="count">0</b><small data-t="participants">Participants</small></div><div class="stat"><b id="tickets">0</b><small data-t="tickets">Total tickets</small></div><div class="stat"><b id="rounds">0</b><small data-t="rounds">Draws</small></div></div>
+<div class="row" style="margin-bottom:10px"><span class="muted small" data-t="roundStatus">Status</span><select id="roundStatus" class="input" onchange="setRoundStatus(this.value)"><option value="open">Open</option><option value="closed">Closed</option></select><span id="statusHint" class="small muted"></span></div>
 <div class="row"><input id="name" class="input grow" placeholder="Username"><select id="role" class="input"><option>Viewer</option><option>Tier 1</option><option>Tier 2</option><option>Tier 3</option></select><input id="manualWeight" class="input" style="width:82px" type="number" min="1" value="1"><button onclick="addParticipant()" data-t="add">Add</button></div>
 <div class="row" style="margin-top:10px"><input id="bulk" class="input grow" placeholder="Paste usernames, one per line"><button onclick="bulkAdd()" data-t="addList">Add list</button><button onclick="clearParticipants()" class="danger" data-t="clear">Clear</button></div>
 <div class="scroll"><table><thead><tr><th data-t="user">User</th><th data-t="role">Role</th><th data-t="weight">Weight</th><th></th></tr></thead><tbody id="people"></tbody></table></div>
@@ -52,10 +59,10 @@ button,input,select{font:inherit}button{border:1px solid var(--line);background:
 </div>
 </main>
 <script>
-const T={en:{title:"Giveaway dashboard",subtitle:"One place for participants, weighted tickets and winners.",connection:"Platform connection",connect:"Connect Twitch",disconnect:"Disconnect",giveaway:"Giveaway",new:"New giveaway",participants:"Participants",tickets:"Total tickets",rounds:"Draws",add:"Add",addList:"Add list",clear:"Clear",user:"User",role:"Role",weight:"Weight",settings:"Draw settings",ticketCommand:"Twitch ticket command",winnerCount:"Number of winners",exclude:"Exclude previous winners",draw:"Draw winner",history:"History"},
-de:{title:"Giveaway-Dashboard",subtitle:"Teilnehmer, gewichtete Tickets und Gewinner an einem Ort.",connection:"Plattform-Verbindung",connect:"Twitch verbinden",disconnect:"Trennen",giveaway:"Gewinnspiel",new:"Neues Gewinnspiel",participants:"Teilnehmer",tickets:"Tickets gesamt",rounds:"Ziehungen",add:"Hinzufügen",addList:"Liste hinzufügen",clear:"Leeren",user:"Benutzer",role:"Rolle",weight:"Gewicht",settings:"Ziehungs-Einstellungen",ticketCommand:"Twitch-Ticket-Befehl",winnerCount:"Anzahl Gewinner",exclude:"Frühere Gewinner ausschließen",draw:"Gewinner ziehen",history:"Verlauf"},
-ru:{title:"Панель розыгрыша",subtitle:"Участники, веса билетов и победители в одном месте.",connection:"Подключение платформы",connect:"Подключить Twitch",disconnect:"Отключить",giveaway:"Розыгрыш",new:"Новый розыгрыш",participants:"Участники",tickets:"Всего билетов",rounds:"Розыгрыши",add:"Добавить",addList:"Добавить список",clear:"Очистить",user:"Пользователь",role:"Роль",weight:"Вес",settings:"Настройки выбора",ticketCommand:"Команда билета Twitch",winnerCount:"Количество победителей",exclude:"Исключать прошлых победителей",draw:"Выбрать победителя",history:"История"}};
-let state=JSON.parse(localStorage.getItem("winnerPicker")||"null")||{platform:"Twitch",name:"",people:[],history:[],settings:{Viewer:1,"Tier 1":2,"Tier 2":5,"Tier 3":10,ticketCommand:"!ticket"}};
+const T={en:{title:"Giveaway dashboard",subtitle:"One place for participants, weighted tickets and winners.",connection:"Platform connection",connect:"Connect Twitch",disconnect:"Disconnect",giveaway:"Giveaway",new:"New giveaway",participants:"Participants",tickets:"Total tickets",rounds:"Draws",add:"Add",addList:"Add list",clear:"Clear",user:"User",role:"Role",weight:"Weight",settings:"Draw settings",ticketCommand:"Twitch ticket command",winnerCount:"Number of winners",exclude:"Exclude previous winners",draw:"Draw winner",history:"History",importTitle:"Comment / chat import",onePerUser:"One entry per user",importComments:"Import entries",importHint:"Format: username: comment, username — comment, or just one username per line.",roundStatus:"Status"},
+de:{title:"Giveaway-Dashboard",importTitle:"Kommentar-/Chat-Import",onePerUser:"Ein Eintrag pro Benutzer",importComments:"Einträge importieren",importHint:"Format: Benutzer: Kommentar, Benutzer — Kommentar oder ein Benutzer pro Zeile.",roundStatus:"Status",,subtitle:"Teilnehmer, gewichtete Tickets und Gewinner an einem Ort.",connection:"Plattform-Verbindung",connect:"Twitch verbinden",disconnect:"Trennen",giveaway:"Gewinnspiel",new:"Neues Gewinnspiel",participants:"Teilnehmer",tickets:"Tickets gesamt",rounds:"Ziehungen",add:"Hinzufügen",addList:"Liste hinzufügen",clear:"Leeren",user:"Benutzer",role:"Rolle",weight:"Gewicht",settings:"Ziehungs-Einstellungen",ticketCommand:"Twitch-Ticket-Befehl",winnerCount:"Anzahl Gewinner",exclude:"Frühere Gewinner ausschließen",draw:"Gewinner ziehen",history:"Verlauf"},
+ru:{title:"Панель розыгрыша",importTitle:"Импорт комментариев / чата",onePerUser:"Один участник на пользователя",importComments:"Импортировать участников",importHint:"Формат: username: комментарий, username — комментарий или один username в строке.",roundStatus:"Статус",,subtitle:"Участники, веса билетов и победители в одном месте.",connection:"Подключение платформы",connect:"Подключить Twitch",disconnect:"Отключить",giveaway:"Розыгрыш",new:"Новый розыгрыш",participants:"Участники",tickets:"Всего билетов",rounds:"Розыгрыши",add:"Добавить",addList:"Добавить список",clear:"Очистить",user:"Пользователь",role:"Роль",weight:"Вес",settings:"Настройки выбора",ticketCommand:"Команда билета Twitch",winnerCount:"Количество победителей",exclude:"Исключать прошлых победителей",draw:"Выбрать победителя",history:"История"}};
+let state=JSON.parse(localStorage.getItem("winnerPicker")||"null")||{platform:"Twitch",name:"",status:"open",people:[],history:[],settings:{Viewer:1,"Tier 1":2,"Tier 2":5,"Tier 3":10,ticketCommand:"!ticket"}};
 let lang=localStorage.getItem("winnerLang")||"en";let ws=null;let twitch={token:sessionStorage.getItem("wp_twitch_token")||"",user:null,subs:{}};
 const $=id=>document.getElementById(id);
 function log(s){$("twitchLog").textContent+=new Date().toLocaleTimeString()+"  "+s+"\n";$("twitchLog").scrollTop=$("twitchLog").scrollHeight}
@@ -71,17 +78,70 @@ let total=state.people.reduce((s,p)=>s+p.weight,0);$("count").textContent=state.
 $("people").innerHTML=state.people.length?state.people.map((p,i)=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.role)+'</td><td>'+p.weight+'</td><td><button class="danger" onclick="removePerson('+i+')">×</button></td></tr>').join(""):'<tr><td colspan="4" class="empty">No participants yet</td></tr>';
 $("history").innerHTML=state.history.length?state.history.slice().reverse().map(h=>'<div class="history-item"><b>'+esc(h.name)+'</b><div class="muted">'+esc(h.winners.join(", "))+' · '+new Date(h.time).toLocaleString()+'</div></div>').join(""):'<div class="muted">No draws yet</div>';
 $("connectionBox").innerHTML=twitch.token&&twitch.user?'<div class="connection"><div class="status"><span class="dot on"></span><b>'+esc(twitch.user.display_name||twitch.user.login)+'</b><span class="muted">· Twitch connected</span></div><div class="small muted">'+esc(twitch.user.login)+' · '+twitch.user.id+'</div></div>':'<div class="connection"><div class="status"><span class="dot"></span><span class="muted">Twitch not connected</span></div></div>';
+renderPlatformConfig();
+$("roundStatus").value=state.status||"open";$("statusHint").textContent=(state.status||"open")==="open"?"Entries can be added.":"Entries are closed.";}
+function renderPlatformConfig(){
+const p=state.platform;
+if(p==="Twitch"){
+$("platformConfig").innerHTML='<div class="row"><input id="clientId" class="input grow" placeholder="Twitch Client ID"><button class="primary" onclick="connectTwitch()">Connect Twitch</button><button onclick="disconnectTwitch()">Disconnect</button></div>';
+$("clientId").value=localStorage.getItem("wp_twitch_client_id")||"";
+$("platformNotice").innerHTML="<b>Twitch:</b> Live chat is collected with EventSub WebSocket. The authenticated broadcaster is used as the giveaway channel.";
+}else if(p==="YouTube"){
+$("platformConfig").innerHTML='<div class="row"><input id="ytApiKey" class="input grow" placeholder="YouTube Data API key"><input id="ytChatId" class="input grow" placeholder="Live chat ID"><button class="primary" onclick="connectYouTube()">Connect YouTube chat</button><button onclick="disconnectYouTube()">Disconnect</button></div>';
+$("ytApiKey").value=localStorage.getItem("wp_yt_api_key")||"";
+$("ytChatId").value=localStorage.getItem("wp_yt_chat_id")||"";
+$("platformNotice").innerHTML="<b>YouTube:</b> paste a Live Chat ID and API key. The app will read live chat messages and turn <code>!ticket</code> messages into entries. YouTube exposes live chat messages and author details through the Live Streaming API.";
+}else{
+$("platformConfig").innerHTML='<div class="connection"><b>'+p+'</b><div class="small muted">Use the import box below for comments now. Direct API collection and eligibility verification will be added without changing the giveaway engine.</div></div>';
+$("platformNotice").innerHTML="<b>"+p+":</b> comment import is ready. Duplicate filtering, keyword filtering and minimum-word filtering work locally.";
+}}
+let ytTimer=null,ytToken="";
+async function connectYouTube(){
+const key=$("ytApiKey").value.trim(),chat=$("ytChatId").value.trim();if(!key||!chat){alert("Enter YouTube API key and Live Chat ID.");return}
+localStorage.setItem("wp_yt_api_key",key);localStorage.setItem("wp_yt_chat_id",chat);state.platform="YouTube";render();log("YouTube chat connected");pollYouTube(true);
 }
+function disconnectYouTube(){if(ytTimer)clearTimeout(ytTimer);ytTimer=null;log("YouTube disconnected")}
+async function pollYouTube(first){
+const key=localStorage.getItem("wp_yt_api_key"),chat=localStorage.getItem("wp_yt_chat_id");if(!key||!chat)return;
+try{
+let url="https://www.googleapis.com/youtube/v3/liveChat/messages?part=id,snippet,authorDetails&liveChatId="+encodeURIComponent(chat)+"&maxResults=200&key="+encodeURIComponent(key);
+if(window._ytPageToken)url+="&pageToken="+encodeURIComponent(window._ytPageToken);
+const r=await fetch(url),d=await r.json();if(!r.ok)throw new Error(d.error?.message||("YouTube HTTP "+r.status));
+window._ytPageToken=d.nextPageToken||window._ytPageToken;
+for(const m of (d.items||[])){
+if(m.snippet?.type!=="textMessageEvent")continue;
+const text=m.snippet.textMessageDetails?.messageText||"",cmd=(state.settings.ticketCommand||"!ticket").toLowerCase();
+if(text.trim().toLowerCase().split(/\s+/)[0]!==cmd)continue;
+const name=m.authorDetails?.displayName||m.snippet.authorChannelId;if(!name)continue;
+if(!state.people.some(p=>p.name.toLowerCase()===name.toLowerCase()))state.people.push({name,role:"Viewer",weight:state.settings.Viewer});
+}
+localStorage.setItem("winnerPicker",JSON.stringify(state));render();
+ytTimer=setTimeout(()=>pollYouTube(false),Math.max(1000,+(d.pollingIntervalMillis||5000)));
+}catch(e){log("YouTube ERROR: "+e.message);ytTimer=setTimeout(()=>pollYouTube(false),7000)}
+}
+function importComments(){
+const raw=$("commentInput").value.trim();if(!raw)return;
+const keyword=$("keywordFilter").value.trim().toLowerCase(),minWords=Math.max(0,+$("minWords").value||0),one=$("onePerUser").checked;
+const seen=new Set(state.people.map(p=>p.name.toLowerCase()));let added=0;
+for(const line of raw.split(/\r?\n/)){let s=line.trim();if(!s)continue;
+let parts=s.match(/^([^:—-]{1,80})\s*[:—-]\s*(.*)$/),name=(parts?parts[1]:s).trim(),comment=(parts?parts[2]:s).trim();
+if(!name)continue;if(keyword&&!comment.toLowerCase().includes(keyword))continue;if(comment&&comment.split(/\s+/).filter(Boolean).length<minWords)continue;
+if(one&&seen.has(name.toLowerCase()))continue;
+state.people.push({name,role:"Viewer",weight:state.settings.Viewer});seen.add(name.toLowerCase());added++;
+}
+$("commentInput").value="";save();log("Imported "+added+" entries from "+state.platform);
+}
+function setRoundStatus(v){state.status=v;save()}
 function setPlatform(p){state.platform=p;save()}
-function newGiveaway(){state.name=$("giveawayName").value.trim()||"Untitled giveaway";state.people=[];$("result").innerHTML="";save()}
-function addParticipant(name,role,weight){name=(name||"").trim();if(!name)return;role=role||$("role").value;weight=Math.max(1,+weight||state.settings[role]||1);let old=state.people.find(p=>p.name.toLowerCase()===name.toLowerCase());if(old){old.role=role;old.weight=weight}else state.people.push({name,role,weight});save()}
+function newGiveaway(){state.status="open";state.name=$("giveawayName").value.trim()||"Untitled giveaway";state.people=[];$("result").innerHTML="";save()}
+function addParticipant(name,role,weight){name=(name||"").trim();if(!name||state.status==="closed")return;role=role||$("role").value;weight=Math.max(1,+weight||state.settings[role]||1);let old=state.people.find(p=>p.name.toLowerCase()===name.toLowerCase());if(old){old.role=role;old.weight=weight}else state.people.push({name,role,weight});save()}
 function addParticipant(){addParticipant($("name").value,$("role").value,$("manualWeight").value);$("name").value=""}
-function bulkAdd(){ $("bulk").value.split(/\n|,|;/).map(x=>x.trim()).filter(Boolean).forEach(n=>{if(!state.people.some(p=>p.name.toLowerCase()===n.toLowerCase()))state.people.push({name:n,role:"Viewer",weight:state.settings.Viewer})});$("bulk").value="";save()}
+function bulkAdd(){if(state.status==="closed")return; $("bulk").value.split(/\n|,|;/).map(x=>x.trim()).filter(Boolean).forEach(n=>{if(!state.people.some(p=>p.name.toLowerCase()===n.toLowerCase()))state.people.push({name:n,role:"Viewer",weight:state.settings.Viewer})});$("bulk").value="";save()}
 function removePerson(i){state.people.splice(i,1);save()}
 function clearParticipants(){if(confirm("Clear all participants?")){state.people=[];save()}}
 function secureRandom(){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296}
 function weightedPick(arr){let total=arr.reduce((s,p)=>s+p.weight,0),r=secureRandom()*total;for(const p of arr){r-=p.weight;if(r<0)return p}return arr[arr.length-1]}
-function draw(){let n=Math.max(1,+$("winnerCount").value||1),used=new Set($("exclude").checked?state.history.flatMap(h=>h.winners):[]),pool=state.people.filter(p=>!used.has(p.name)),w=[];while(pool.length&&w.length<n){let p=weightedPick(pool);w.push(p.name);pool.splice(pool.indexOf(p),1)}if(!w.length){$("result").innerHTML='<div class="result"><span class="muted">No eligible participants.</span></div>';return}state.history.push({name:state.name||"Untitled giveaway",platform:state.platform,winners:w,time:Date.now()});localStorage.setItem("winnerPicker",JSON.stringify(state));$("result").innerHTML='<div class="result"><div class="muted">'+state.platform+'</div><strong>'+w.map(esc).join("<br>")+"</strong></div>";render()}
+function draw(){if(!state.people.length){$("result").innerHTML='<div class="result"><span class="muted">No participants.</span></div>';return}let n=Math.max(1,+$("winnerCount").value||1),used=new Set($("exclude").checked?state.history.flatMap(h=>h.winners):[]),pool=state.people.filter(p=>!used.has(p.name)),w=[];while(pool.length&&w.length<n){let p=weightedPick(pool);w.push(p.name);pool.splice(pool.indexOf(p),1)}if(!w.length){$("result").innerHTML='<div class="result"><span class="muted">No eligible participants.</span></div>';return}state.history.push({name:state.name||"Untitled giveaway",platform:state.platform,winners:w,time:Date.now()});localStorage.setItem("winnerPicker",JSON.stringify(state));$("result").innerHTML='<div class="result"><div class="muted">'+state.platform+'</div><strong>'+w.map(esc).join("<br>")+"</strong></div>";render()}
 function exportData(){let b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="winner-picker.json";a.click();URL.revokeObjectURL(a.href)}
 function importData(){let i=document.createElement("input");i.type="file";i.accept=".json,application/json";i.onchange=()=>{let f=i.files[0],r=new FileReader();r.onload=()=>{try{state=JSON.parse(r.result);save()}catch(e){alert("Invalid file")}};r.readAsText(f)};i.click()}
 function redirectUri(){return location.origin+location.pathname}
@@ -106,8 +166,7 @@ async function handleChat(ev){
 let cmd=(state.settings.ticketCommand||"!ticket").toLowerCase();if((ev.message.text||"").trim().toLowerCase().split(/\s+/)[0]!==cmd)return;
 let role="Viewer",weight=state.settings.Viewer||1;try{let q="https://api.twitch.tv/helix/subscriptions?broadcaster_id="+encodeURIComponent(twitch.user.id)+"&user_id="+encodeURIComponent(ev.chatter_user_id);let d=await twitchFetch(q);if(d.data&&d.data[0]){let tier=d.data[0].tier;role=tier==="3000"?"Tier 3":tier==="2000"?"Tier 2":"Tier 1";weight=state.settings[role]||weight}}catch(e){log("Tier lookup failed for "+ev.chatter_user_name+": "+e.message)}
 if(!state.people.some(p=>p.name.toLowerCase()===ev.chatter_user_name.toLowerCase())){state.people.push({name:ev.chatter_user_name,role,weight});localStorage.setItem("winnerPicker",JSON.stringify(state));render();log("Ticket: "+ev.chatter_user_name+" ["+role+" ×"+weight+"]")}else log("Duplicate ticket ignored: "+ev.chatter_user_name)}
-function disconnectTwitch(){if(ws)try{ws.close()}catch(e){}ws=null;twitch={token:"",user:null,subs:{}};sessionStorage.removeItem("wp_twitch_token");render();log("Disconnected")}
-$("clientId").value=localStorage.getItem("wp_twitch_client_id")||"";
+function disconnectTwitch(){if(ytTimer)clearTimeout(ytTimer);if(ws)try{ws.close()}catch(e){}ws=null;twitch={token:"",user:null,subs:{}};sessionStorage.removeItem("wp_twitch_token");render();log("Disconnected")}
 finishTwitch().then(()=>render());
 render();
 </script>
