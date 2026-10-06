@@ -34,7 +34,7 @@ button,input,select{font:inherit}button{border:1px solid var(--line);background:
 <div class="row"><input id="giveawayName" class="input grow" placeholder="Giveaway name"><button class="primary" onclick="newGiveaway()" data-t="new">New giveaway</button></div>
 <div class="stats"><div class="stat"><b id="count">0</b><small data-t="participants">Participants</small></div><div class="stat"><b id="tickets">0</b><small data-t="tickets">Total tickets</small></div><div class="stat"><b id="rounds">0</b><small data-t="rounds">Draws</small></div></div>
 <div class="row" style="margin-bottom:10px"><span class="muted small" data-t="roundStatus">Status</span><select id="roundStatus" class="input" onchange="setRoundStatus(this.value)"><option value="open">Open</option><option value="closed">Closed</option></select><span id="statusHint" class="small muted"></span></div>
-<div class="row"><input id="name" class="input grow" placeholder="Username"><select id="role" class="input"><option>Viewer</option><option>Tier 1</option><option>Tier 2</option><option>Tier 3</option></select><input id="manualWeight" class="input" style="width:82px" type="number" min="1" value="1"><button onclick="addParticipant()" data-t="add">Add</button></div>
+<div class="row"><input id="name" class="input grow" placeholder="Username"><select id="role" class="input"></select><input id="manualWeight" class="input" style="width:82px" type="number" min="1" value="1"><button onclick="manualAdd()" data-t="add">Add</button></div>
 <div class="row" style="margin-top:10px"><input id="bulk" class="input grow" placeholder="Paste usernames, one per line"><button onclick="bulkAdd()" data-t="addList">Add list</button><button onclick="clearParticipants()" class="danger" data-t="clear">Clear</button></div>
 <div class="scroll"><table><thead><tr><th data-t="user">User</th><th data-t="role">Role</th><th data-t="weight">Weight</th><th></th></tr></thead><tbody id="people"></tbody></table></div>
 </div>
@@ -42,12 +42,7 @@ button,input,select{font:inherit}button{border:1px solid var(--line);background:
 <aside>
 <div class="card">
 <h2 data-t="settings">Draw settings</h2>
-<div class="settings">
-<div class="setting"><span>Viewer</span><input id="wViewer" class="input" type="number" min="1" value="1" onchange="saveSettings()"></div>
-<div class="setting"><span>Tier 1</span><input id="wTier1" class="input" type="number" min="1" value="2" onchange="saveSettings()"></div>
-<div class="setting"><span>Tier 2</span><input id="wTier2" class="input" type="number" min="1" value="5" onchange="saveSettings()"></div>
-<div class="setting"><span>Tier 3</span><input id="wTier3" class="input" type="number" min="1" value="10" onchange="saveSettings()"></div>
-</div>
+<div class="settings" id="weightSettings"></div>
 <div style="margin-top:12px"><label data-t="ticketCommand">Twitch ticket command</label><input id="ticketCommand" class="input wide" value="!ticket" style="margin-top:6px" onchange="saveSettings()"></div>
 <div style="margin-top:10px"><label data-t="winnerCount">Number of winners</label><input id="winnerCount" class="input wide" type="number" min="1" value="1" style="margin-top:6px"></div>
 <label class="setting" style="margin-top:10px"><span data-t="exclude">Exclude previous winners</span><input id="exclude" type="checkbox" checked></label>
@@ -69,17 +64,27 @@ function log(s){$("twitchLog").textContent+=new Date().toLocaleTimeString()+"  "
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function save(){localStorage.setItem("winnerPicker",JSON.stringify(state));render()}
 function setLang(x){lang=x;localStorage.setItem("winnerLang",x);render()}
-function saveSettings(){["Viewer","Tier 1","Tier 2","Tier 3"].forEach((r,i)=>state.settings[r]=Math.max(1,+[$("wViewer"),$("wTier1"),$("wTier2"),$("wTier3")][i].value||1));state.settings.ticketCommand=$("ticketCommand").value.trim()||"!ticket";save()}
+function saveSettings(){const ids=["wViewer","wTier1","wTier2","wTier3"];["Viewer","Tier 1","Tier 2","Tier 3"].forEach((r,i)=>{const el=$(ids[i]);if(el)state.settings[r]=Math.max(1,+el.value||1)});state.settings.ticketCommand=$("ticketCommand").value.trim()||"!ticket";save()}
 function render(){
 document.documentElement.lang=lang;$("lang").value=lang;document.querySelectorAll("[data-t]").forEach(e=>e.textContent=T[lang][e.dataset.t]||e.textContent);
 $("platforms").innerHTML=["Twitch","YouTube","Instagram","TikTok"].map(p=>'<button class="platform '+(state.platform===p?"active":"")+'" onclick="setPlatform(\''+p+'\')">'+p+"</button>").join("");
-$("giveawayName").value=state.name||"";["Viewer","Tier 1","Tier 2","Tier 3"].forEach((r,i)=>[$("wViewer"),$("wTier1"),$("wTier2"),$("wTier3")][i].value=state.settings[r]);$("ticketCommand").value=state.settings.ticketCommand||"!ticket";
+$("giveawayName").value=state.name||"";renderRoleSettings();$("ticketCommand").value=state.settings.ticketCommand||"!ticket";
 let total=state.people.reduce((s,p)=>s+p.weight,0);$("count").textContent=state.people.length;$("tickets").textContent=total;$("rounds").textContent=state.history.length;
 $("people").innerHTML=state.people.length?state.people.map((p,i)=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.role)+'</td><td>'+p.weight+'</td><td><button class="danger" onclick="removePerson('+i+')">×</button></td></tr>').join(""):'<tr><td colspan="4" class="empty">No participants yet</td></tr>';
 $("history").innerHTML=state.history.length?state.history.slice().reverse().map(h=>'<div class="history-item"><b>'+esc(h.name)+'</b><div class="muted">'+esc(h.winners.join(", "))+' · '+new Date(h.time).toLocaleString()+'</div></div>').join(""):'<div class="muted">No draws yet</div>';
 $("connectionBox").innerHTML=twitch.token&&twitch.user?'<div class="connection"><div class="status"><span class="dot on"></span><b>'+esc(twitch.user.display_name||twitch.user.login)+'</b><span class="muted">· Twitch connected</span></div><div class="small muted">'+esc(twitch.user.login)+' · '+twitch.user.id+'</div></div>':'<div class="connection"><div class="status"><span class="dot"></span><span class="muted">Twitch not connected</span></div></div>';
-renderPlatformConfig();
+renderPlatformConfig();renderRoleSettings();
 $("roundStatus").value=state.status||"open";$("statusHint").textContent=(state.status||"open")==="open"?"Entries can be added.":"Entries are closed.";}
+function renderRoleSettings(){
+const p=state.platform;
+const roles=p==="Twitch"?["Viewer","Tier 1","Tier 2","Tier 3"]:p==="YouTube"?["Viewer","Member"]:["Participant"];
+const defaults={Viewer:1,"Tier 1":2,"Tier 2":5,"Tier 3":10,Member:2,Participant:1};
+roles.forEach(r=>{if(state.settings[r]==null)state.settings[r]=defaults[r]});
+$("weightSettings").innerHTML=roles.map(r=>'<div class="setting"><span>'+esc(r)+'</span><input id="weight_'+r.replace(/\\s/g,"_")+'" class="input" type="number" min="1" value="'+(state.settings[r]||1)+'" onchange="state.settings[''+r+'']=Math.max(1,+this.value||1);save()"></div>').join("");
+$("role").innerHTML=roles.map(r=>'<option>'+esc(r)+'</option>').join("");
+$("manualWeight").value=state.settings[$("role").value]||1;
+$("role").onchange=()=>{$("manualWeight").value=state.settings[$("role").value]||1};
+}
 function renderPlatformConfig(){
 const p=state.platform;
 if(p==="Twitch"){
@@ -134,9 +139,9 @@ $("commentInput").value="";save();log("Imported "+added+" entries from "+state.p
 function setRoundStatus(v){state.status=v;save()}
 function setPlatform(p){state.platform=p;save()}
 function newGiveaway(){state.status="open";state.name=$("giveawayName").value.trim()||"Untitled giveaway";state.people=[];$("result").innerHTML="";save()}
-function addParticipant(name,role,weight){name=(name||"").trim();if(!name||state.status==="closed")return;role=role||$("role").value;weight=Math.max(1,+weight||state.settings[role]||1);let old=state.people.find(p=>p.name.toLowerCase()===name.toLowerCase());if(old){old.role=role;old.weight=weight}else state.people.push({name,role,weight});save()}
-function addParticipant(){addParticipant($("name").value,$("role").value,$("manualWeight").value);$("name").value=""}
-function bulkAdd(){if(state.status==="closed")return; $("bulk").value.split(/\n|,|;/).map(x=>x.trim()).filter(Boolean).forEach(n=>{if(!state.people.some(p=>p.name.toLowerCase()===n.toLowerCase()))state.people.push({name:n,role:"Viewer",weight:state.settings.Viewer})});$("bulk").value="";save()}
+function addPerson(name,role,weight){name=(name||"").trim();if(!name||state.status==="closed")return;role=role||$("role").value;weight=Math.max(1,+weight||state.settings[role]||1);let old=state.people.find(p=>p.name.toLowerCase()===name.toLowerCase());if(old){old.role=role;old.weight=weight}else state.people.push({name,role,weight});save()}
+function manualAdd(){addParticipant($("name").value,$("role").value,$("manualWeight").value);$("name").value=""}
+function bulkAdd(){if(state.status==="closed")return; const role=$("role").value||"Viewer"; $("bulk").value.split(/\n|,|;/).map(x=>x.trim()).filter(Boolean).forEach(n=>{if(!state.people.some(p=>p.name.toLowerCase()===n.toLowerCase()))state.people.push({name:n,role,weight:state.settings[role]||1})});$("bulk").value="";save()}
 function removePerson(i){state.people.splice(i,1);save()}
 function clearParticipants(){if(confirm("Clear all participants?")){state.people=[];save()}}
 function secureRandom(){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296}
