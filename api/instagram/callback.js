@@ -14,8 +14,8 @@ export default async function handler(req,res){
     const profileRes=await fetch("https://graph.instagram.com/me?fields=id,username,user_id&access_token="+encodeURIComponent(token.access_token));
     const profile=await profileRes.json();
     if(!profileRes.ok)throw new Error(profile.error?.message||"Profile lookup failed");
-    const payload=Buffer.from(JSON.stringify({access_token:token.access_token,user_id:profile.user_id||profile.id,username:profile.username||""})).toString("base64url");
+    res.setHeader("Set-Cookie","ig_access_token="+encodeURIComponent(token.access_token)+"; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=5184000");
     res.setHeader("Cache-Control","no-store");
-    res.redirect("/winner-picker.html?instagram_connected=1&instagram_session="+encodeURIComponent(payload));
+    res.redirect("/winner-picker.html?instagram_connected=1");
   }catch(e){res.status(400).send("Instagram connection failed: "+e.message)}
 }
