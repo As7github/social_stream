@@ -80,7 +80,7 @@ const p=state.platform;
 const roles=p==="Twitch"?["Viewer","Tier 1","Tier 2","Tier 3"]:p==="YouTube"?["Viewer","Member"]:["Participant"];
 const defaults={Viewer:1,"Tier 1":2,"Tier 2":5,"Tier 3":10,Member:2,Participant:1};
 roles.forEach(r=>{if(state.settings[r]==null)state.settings[r]=defaults[r]});
-$("weightSettings").innerHTML=roles.map(r=>'<div class="setting"><span>'+esc(r)+'</span><input id="weight_'+r.replace(/\\s/g,"_")+'" class="input" type="number" min="1" value="'+(state.settings[r]||1)+'" onchange="state.settings[''+r+'']=Math.max(1,+this.value||1);save()"></div>').join("");
+$("weightSettings").innerHTML=roles.map(r=>'<div class="setting"><span>'+esc(r)+'</span><input id="weight_'+r.replace(/\\s/g,"_")+'" class="input" type="number" min="1" value="'+(state.settings[r]||1)+'" onchange="state.settings[&quot;'+r+'&quot;]=Math.max(1,+this.value||1);save()"></div>').join("");
 $("role").innerHTML=roles.map(r=>'<option>'+esc(r)+'</option>').join("");
 $("manualWeight").value=state.settings[$("role").value]||1;
 $("role").onchange=()=>{$("manualWeight").value=state.settings[$("role").value]||1};
@@ -140,7 +140,7 @@ function setRoundStatus(v){state.status=v;save()}
 function setPlatform(p){state.platform=p;save()}
 function newGiveaway(){state.status="open";state.name=$("giveawayName").value.trim()||"Untitled giveaway";state.people=[];$("result").innerHTML="";save()}
 function addPerson(name,role,weight){name=(name||"").trim();if(!name||state.status==="closed")return;role=role||$("role").value;weight=Math.max(1,+weight||state.settings[role]||1);let old=state.people.find(p=>p.name.toLowerCase()===name.toLowerCase());if(old){old.role=role;old.weight=weight}else state.people.push({name,role,weight});save()}
-function manualAdd(){addParticipant($("name").value,$("role").value,$("manualWeight").value);$("name").value=""}
+function manualAdd(){addPerson($("name").value,$("role").value,$("manualWeight").value);$("name").value=""}
 function bulkAdd(){if(state.status==="closed")return; const role=$("role").value||"Viewer"; $("bulk").value.split(/\n|,|;/).map(x=>x.trim()).filter(Boolean).forEach(n=>{if(!state.people.some(p=>p.name.toLowerCase()===n.toLowerCase()))state.people.push({name:n,role,weight:state.settings[role]||1})});$("bulk").value="";save()}
 function removePerson(i){state.people.splice(i,1);save()}
 function clearParticipants(){if(confirm("Clear all participants?")){state.people=[];save()}}
