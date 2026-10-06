@@ -148,17 +148,16 @@ async function loadInstagramMedia(){
 async function loadInstagramComments(){
  const id=$("igMediaList")?.value;if(!id){log("Select an Instagram publication.");return}
  try{
-  let after="",total=0,page=0;
+  let after="",total=0,page=0;const all=[];
   while(true){
    const r=await fetch("/api/instagram/comments?media_id="+encodeURIComponent(id)+(after?"&after="+encodeURIComponent(after):""));
    const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load comments");
-   const lines=(d.data||[]).map(x=>(x.username||"user")+": "+(x.text||""));
-   if(lines.length)importComments(lines.join("\n"),"Instagram");
-   total+=lines.length;page++;
-   log("Instagram: loaded "+total+" comments...");
+   for(const x of (d.data||[]))all.push((x.username||"user")+": "+(x.text||""));
+   total+=d.data?.length||0;page++;log("Instagram: loaded "+total+" comments...");
    after=d.paging?.cursors?.after||"";
    if(!after||!d.paging?.next||page>=300)break;
   }
+  if(all.length)importComments(all.join("\n"),"Instagram");
   log("Instagram complete: "+total+" comments loaded.");
  }catch(e){log("Instagram comments error: "+e.message)}
 }
@@ -191,7 +190,7 @@ function disconnectYouTube(){if(ytTimer)clearTimeout(ytTimer);ytTimer=null;ytTok
 async function pollYouTubeOAuth(first){
 if(!ytToken||!ytChatId)return;
 try{
- const d=await ytFetch("https://www.googleapis.com/youtube/v3/liveChat/messages?part=id,snippet,authorDetails&liveChatId="+encodeURIComponent(ytChatId)+"&maxResults=200"+(window._ytPageToken?"&pageToken="+encodeURIComponent(window._ytPageToken):""));
+ const d=await ytFetch("https://www.googleapis.com/youtube/v3/liveChat/messages?part=id,snippet,authorDetails&liveChatId="+encodeURIComponent(ytChatId)+"&maxResults=2000"+(window._ytPageToken?"&pageToken="+encodeURIComponent(window._ytPageToken):""));
  window._ytPageToken=d.nextPageToken||window._ytPageToken;
  for(const m of (d.items||[])){
   const type=m.snippet?.type,name=m.authorDetails?.displayName||m.snippet?.authorChannelId;if(!name)continue;
