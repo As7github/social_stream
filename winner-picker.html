@@ -95,9 +95,9 @@ $("platformNotice").innerHTML="<b>Twitch:</b> Live chat is collected with EventS
 $("platformConfig").innerHTML='<div class="row"><input id="ytApiKey" class="input grow" placeholder="YouTube Data API key"><input id="ytChatId" class="input grow" placeholder="Live chat ID"><button class="primary" onclick="connectYouTube()">Connect YouTube chat</button><button onclick="disconnectYouTube()">Disconnect</button></div>';
 $("ytApiKey").value=localStorage.getItem("wp_yt_api_key")||"";
 $("ytChatId").value=localStorage.getItem("wp_yt_chat_id")||"";
-$("platformNotice").innerHTML="<b>YouTube:</b> paste a Live Chat ID and API key. The app will read live chat messages and turn <code>!ticket</code> messages into entries. YouTube exposes live chat messages and author details through the Live Streaming API.";
+$("platformNotice").innerHTML="<b>YouTube:</b> live chat <code>!ticket</code> entries are collected automatically. Membership chat events are recognized as Member entries; exact membership-level mapping will be added after OAuth membership access is connected.";
 }else{
-$("platformConfig").innerHTML='<div class="connection"><b>'+p+'</b><div class="small muted">Use the import box below for comments now. Direct API collection and eligibility verification will be added without changing the giveaway engine.</div></div>';
+$("platformConfig").innerHTML='<div class="connection"><b>'+p+'</b><div class="small muted">Comment import is ready now. Follow verification is only enabled when the platform API provides a supported way to verify the participant.</div></div>';
 $("platformNotice").innerHTML="<b>"+p+":</b> comment import is ready. Duplicate filtering, keyword filtering and minimum-word filtering work locally.";
 }}
 let ytTimer=null,ytToken="";
@@ -114,11 +114,19 @@ if(window._ytPageToken)url+="&pageToken="+encodeURIComponent(window._ytPageToken
 const r=await fetch(url),d=await r.json();if(!r.ok)throw new Error(d.error?.message||("YouTube HTTP "+r.status));
 window._ytPageToken=d.nextPageToken||window._ytPageToken;
 for(const m of (d.items||[])){
-if(m.snippet?.type!=="textMessageEvent")continue;
-const text=m.snippet.textMessageDetails?.messageText||"",cmd=(state.settings.ticketCommand||"!ticket").toLowerCase();
-if(text.trim().toLowerCase().split(/\s+/)[0]!==cmd)continue;
-const name=m.authorDetails?.displayName||m.snippet.authorChannelId;if(!name)continue;
-if(!state.people.some(p=>p.name.toLowerCase()===name.toLowerCase()))state.people.push({name,role:"Viewer",weight:state.settings.Viewer});
+const type=m.snippet?.type;
+const name=m.authorDetails?.displayName||m.snippet?.authorChannelId;if(!name)continue;
+let role="Viewer",weight=state.settings.Viewer||1;
+if(m.authorDetails?.isChatModerator||m.authorDetails?.isChatOwner)role="Member";
+if(m.snippet?.memberMilestoneChatDetails?.memberLevelName)role="Member";
+if(m.snippet?.newSponsorDetails?.memberLevelName)role="Member";
+if(type==="textMessageEvent"){
+ const text=m.snippet.textMessageDetails?.messageText||"",cmd=(state.settings.ticketCommand||"!ticket").toLowerCase();
+ if(text.trim().toLowerCase().split(/\s+/)[0]!==cmd)continue;
+}
+if(type==="memberMilestoneChatEvent"||type==="newSponsorEvent")role="Member";
+weight=state.settings[role]||weight;
+if((type==="textMessageEvent"||type==="memberMilestoneChatEvent")&&!state.people.some(p=>p.name.toLowerCase()===name.toLowerCase()))state.people.push({name,role,weight});
 }
 localStorage.setItem("winnerPicker",JSON.stringify(state));render();
 ytTimer=setTimeout(()=>pollYouTube(false),Math.max(1000,+(d.pollingIntervalMillis||5000)));
