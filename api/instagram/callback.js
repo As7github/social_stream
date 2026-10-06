@@ -3,7 +3,7 @@ export default async function handler(req,res){
   if(error)return res.status(400).send("Instagram authorization failed: "+error);
   if(!code)return res.status(400).send("Missing authorization code.");
   const cookies=Object.fromEntries((req.headers.cookie||"").split(";").map(x=>x.trim().split("=")).filter(x=>x.length===2).map(([k,...v])=>[k,decodeURIComponent(v.join("="))]));
-  if(!state||!cookies.wp_oauth_ig_state||state!==cookies.wp_oauth_ig_state)return res.status(400).send("Invalid OAuth state.");
+  if(!state||!cookies.wp_ig_oauth_state||state!==cookies.wp_oauth_ig_state)return res.status(400).send("Invalid OAuth state.");
   const clientId=process.env.INSTAGRAM_CLIENT_ID;
   const clientSecret=process.env.INSTAGRAM_CLIENT_SECRET;
   const redirect=process.env.INSTAGRAM_REDIRECT_URI||((req.headers["x-forwarded-proto"]||"https")+"://"+req.headers.host+"/api/instagram/callback");
