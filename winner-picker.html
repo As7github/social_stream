@@ -148,12 +148,18 @@ async function loadInstagramMedia(){
 async function loadInstagramComments(){
  const id=$("igMediaList")?.value;if(!id){log("Select an Instagram publication.");return}
  try{
-  const raw=sessionStorage.getItem("ig_session");const s=JSON.parse(atob(raw));
-  const r=await fetch("/api/instagram/comments?media_id="+encodeURIComponent(id),{headers:{Authorization:"Bearer "+s.access_token}});
-  const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load comments");
-  const lines=(d.data||[]).map(x=>(x.username||"user")+": "+(x.text||""));
-  if(typeof importComments==="function")importComments(lines.join("\n"),"Instagram");
-  log("Instagram comments loaded: "+lines.length);
+  let after="",total=0,page=0;
+  while(true){
+   const r=await fetch("/api/instagram/comments?media_id="+encodeURIComponent(id)+(after?"&after="+encodeURIComponent(after):""));
+   const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load comments");
+   const lines=(d.data||[]).map(x=>(x.username||"user")+": "+(x.text||""));
+   if(lines.length)importComments(lines.join("\n"),"Instagram");
+   total+=lines.length;page++;
+   log("Instagram: loaded "+total+" comments...");
+   after=d.paging?.cursors?.after||"";
+   if(!after||!d.paging?.next||page>=300)break;
+  }
+  log("Instagram complete: "+total+" comments loaded.");
  }catch(e){log("Instagram comments error: "+e.message)}
 }
 async function connectInstagram(){
