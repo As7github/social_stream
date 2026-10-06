@@ -70,8 +70,14 @@ function queueRemoteSave(){
  if(!remoteReady)return;
  clearTimeout(remoteTimer);remoteTimer=setTimeout(async()=>{try{
   await fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"save_giveaway",workspace_id:state.workspaceId,giveaway_id:state.giveawayId,name:state.name,platform:state.platform,status:state.status,settings:state.settings})});
+ }catch(e){console.warn("Remote metadata:",e.message)}},700);
+}
+let participantTimer=null;
+function queueParticipantSync(){
+ if(!remoteReady)return;
+ clearTimeout(participantTimer);participantTimer=setTimeout(async()=>{try{
   await fetch("/api/storage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"replace_participants",workspace_id:state.workspaceId,giveaway_id:state.giveawayId,participants:state.people.map(p=>({key:p.key||p.name,name:p.name,role:p.role,weight:p.weight}))})});
- }catch(e){console.warn("Remote storage:",e.message)}},1200);
+ }catch(e){console.warn("Remote participants:",e.message)}},1500);
 }
 async function loadRemote(){
  try{
