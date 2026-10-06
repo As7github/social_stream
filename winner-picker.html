@@ -92,7 +92,7 @@ $("platformConfig").innerHTML='<div class="row"><input id="clientId" class="inpu
 $("clientId").value=localStorage.getItem("wp_twitch_client_id")||"";
 $("platformNotice").innerHTML="<b>Twitch:</b> Live chat is collected with EventSub WebSocket. The authenticated broadcaster is used as the giveaway channel.";
 }else if(p==="YouTube"){
-$("platformConfig").innerHTML='<div class="row"><input id="igClientId" class="input grow" placeholder="Meta App ID"><button class="primary" onclick="connectInstagram()">Connect Instagram</button></div><div class="row" style="margin-top:8px"><textarea id="igComments" class="input grow" style="min-height:90px" placeholder="Fallback: paste comments here"></textarea><button onclick="connectInstagramFallback()">Import comments</button></div>';
+$("platformConfig").innerHTML='<div class="row"><input id="igClientId" class="input grow" placeholder="Meta App ID"><button class="primary" onclick="connectInstagram()">Connect Instagram</button><button onclick="loadInstagramMedia()">Load publications</button></div><div class="row" style="margin-top:8px"><select id="igMediaList" class="input grow"><option value="">Load publications first</option></select><button onclick="loadInstagramComments()">Load comments</button></div><div class="row" style="margin-top:8px"><textarea id="igComments" class="input grow" style="min-height:70px" placeholder="Fallback: paste comments here"></textarea><button onclick="connectInstagramFallback()">Import manually</button></div>';
 $("ytClientId").value=localStorage.getItem("wp_yt_client_id")||"";
 $("ytApiKey").value=localStorage.getItem("wp_yt_api_key")||"";
 $("ytChatId").value=localStorage.getItem("wp_yt_chat_id")||"";
@@ -134,6 +134,28 @@ async function connectYouTube(){
 const key=$("ytApiKey").value.trim(),chat=$("ytChatId").value.trim();if(!key||!chat){alert("Enter YouTube API key and Live Chat ID.");return}
 localStorage.setItem("wp_yt_api_key",key);localStorage.setItem("wp_yt_chat_id",chat);state.platform="YouTube";render();log("YouTube chat connected");pollYouTube(true);
 }
+async function loadInstagramMedia(){
+ const raw=sessionStorage.getItem("ig_session");
+ if(!raw){log("Connect Instagram first.");return}
+ try{
+  const s=JSON.parse(atob(raw)); const r=await fetch("/api/instagram/media?limit=50",{headers:{Authorization:"Bearer "+s.access_token}});
+  const d=await r.json(); if(!r.ok)throw new Error(d.error||"Could not load media");
+  const box=$("igMediaList"); if(!box)return;
+  box.innerHTML=(d.data||[]).map(x=>'<option value="'+x.id+'">'+escapeHtml((x.caption||"Untitled").slice(0,90))+' — '+(x.timestamp||"")+'</option>').join("");
+  log("Instagram publications loaded: "+(d.data||[]).length);
+ }catch(e){log("Instagram media error: "+e.message)}
+}
+async function loadInstagramComments(){
+ const id=$("igMediaList")?.value;if(!id){log("Select an Instagram publication.");return}
+ try{
+  const raw=sessionStorage.getItem("ig_session");const s=JSON.parse(atob(raw));
+  const r=await fetch("/api/instagram/comments?media_id="+encodeURIComponent(id),{headers:{Authorization:"Bearer "+s.access_token}});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load comments");
+  const lines=(d.data||[]).map(x=>(x.username||"user")+": "+(x.text||""));
+  if(typeof importComments==="function")importComments(lines.join("\n"),"Instagram");
+  log("Instagram comments loaded: "+lines.length);
+ }catch(e){log("Instagram comments error: "+e.message)}
+}
 async function connectInstagram(){
  const client=$("igClientId")?.value.trim();
  if(!client){alert("Enter Meta App ID first.");return}
@@ -145,6 +167,9 @@ async function connectInstagram(){
  location.href="https://www.instagram.com/oauth/authorize?client_id="+encodeURIComponent(client)+"&redirect_uri="+encodeURIComponent(redirect)+"&response_type=code&scope="+encodeURIComponent(scope)+"&state="+encodeURIComponent(state);
 }
 async function finishInstagramOAuth(){
+ const q=new URLSearchParams(location.search);const s=q.get("instagram_session");
+ if(s){sessionStorage.setItem("ig_session",s);history.replaceState(null,"",location.pathname);log("Instagram connected.");}
+
  const q=new URLSearchParams(location.search);const code=q.get("code"),state=q.get("state");
  if(!code||!state||state!==sessionStorage.getItem("wp_ig_oauth_state"))return;
  history.replaceState(null,"",location.pathname);
