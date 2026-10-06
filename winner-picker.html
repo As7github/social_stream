@@ -133,8 +133,8 @@ $("platformConfig").innerHTML='<div class="row"><input id="igClientId" class="in
 $("igClientId").value=localStorage.getItem("wp_ig_client_id")||"";
 $("platformNotice").innerHTML="<b>Instagram:</b> comments are loaded page-by-page, so large posts are not limited to the first 100 comments.";
 }else if(p==="TikTok"){
-$("platformConfig").innerHTML='<div class="row"><input id="ttVideoId" class="input grow" placeholder="TikTok video ID"><button class="primary" onclick="loadTikTokComments()">Load comments</button></div><div class="row" style="margin-top:8px"><textarea id="ttComments" class="input grow" style="min-height:70px" placeholder="Fallback: paste/export TikTok comments here"></textarea><button onclick="importTikTokFallback()">Import manually</button></div>';
-$("platformNotice").innerHTML="<b>TikTok:</b> the official Research API supports paginated comment retrieval, but access requires TikTok Research Tools approval. If unavailable, use manual import.";
+$("platformConfig").innerHTML='<div class="row"><input id="ttVideoId" class="input grow" placeholder="TikTok video URL"><button class="primary" onclick="loadTikTokComments()">Load all comments</button></div><div class="row" style="margin-top:8px"><textarea id="ttComments" class="input grow" style="min-height:70px" placeholder="Fallback: paste/export TikTok comments here"></textarea><button onclick="importTikTokFallback()">Import manually</button></div>';
+$("platformNotice").innerHTML="<b>TikTok:</b> paste the public video link. The collector retrieves the public comments, then our picker applies the same giveaway filters and unique-user rule.";
 }else{
 $("platformConfig").innerHTML='<div class="connection"><b>'+p+'</b></div>';
 $("platformNotice").textContent="";
@@ -219,6 +219,34 @@ function connectInstagramFallback(){
  const raw=$("igComments")?.value||"";if(!raw.trim())return;
  importComments(raw,"Instagram");
 }
+function importTikTokFallback(){const raw=$("ttComments")?.value||"";if(!raw.trim())return;importComments(raw,"TikTok");}
+let ttTimer=null;
+async function loadTikTokComments(){
+ const video=$("ttVideoId")?.value.trim();if(!video){alert("Paste the public TikTok video URL first.");return}
+ if(ttTimer)clearInterval(ttTimer);
+ try{
+  log("TikTok: starting comment collection...");
+  const r=await fetch("/api/tiktok/comments?action=start&video_url="+encodeURIComponent(video));
+  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Could not start TikTok collection");
+  const runId=d.run_id;if(!runId)throw new Error("TikTok collector did not return a run ID");
+  let lastStatus="";
+  const check=async()=>{
+   try{
+    const sr=await fetch("/api/tiktok/comments?action=status&run_id="+encodeURIComponent(runId));
+    const sd=await sr.json().catch(()=>({}));if(!sr.ok)throw new Error(sd.error||"TikTok status error");
+    if(sd.status!==lastStatus){lastStatus=sd.status;log("TikTok: "+sd.status)}
+    if(sd.ready){
+     clearInterval(ttTimer);ttTimer=null;
+     const all=(sd.comments||[]).map(x=>(x.username||"user")+": "+(x.text||""));
+     if(all.length)importComments(all.join("\n"),"TikTok");
+     log("TikTok complete: "+all.length+" comments loaded.");
+    }else if(["FAILED","ABORTED","TIMED-OUT"].includes(sd.status)){clearInterval(ttTimer);ttTimer=null;throw new Error(sd.error||("TikTok collection "+sd.status.toLowerCase()))}
+   }catch(e){clearInterval(ttTimer);ttTimer=null;log("TikTok error: "+e.message)}
+  };
+  await check();if(!ttTimer)ttTimer=setInterval(check,3000);
+ }catch(e){log("TikTok error: "+e.message);alert(e.message)}
+}
+
 function disconnectYouTube(){if(ytTimer)clearTimeout(ytTimer);ytTimer=null;ytToken="";ytChatId="";ytChannelId="";sessionStorage.removeItem("wp_yt_token");sessionStorage.removeItem("wp_yt_chat_id");sessionStorage.removeItem("wp_yt_channel_id");log("YouTube disconnected")}
 async function pollYouTubeOAuth(first){
 if(!ytToken||!ytChatId)return;
