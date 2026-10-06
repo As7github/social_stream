@@ -138,7 +138,7 @@ async function connectInstagram(){
  const client=$("igClientId")?.value.trim();
  if(!client){alert("Enter Meta App ID first.");return}
  localStorage.setItem("wp_ig_client_id",client);
- const redirect=location.origin+location.pathname;
+ const redirect=location.origin+"/api/instagram/callback";
  const state=Math.random().toString(36).slice(2);
  sessionStorage.setItem("wp_ig_oauth_state",state);
  const scope="instagram_business_basic,instagram_business_manage_comments";
@@ -149,7 +149,7 @@ async function finishInstagramOAuth(){
  if(!code||!state||state!==sessionStorage.getItem("wp_ig_oauth_state"))return;
  history.replaceState(null,"",location.pathname);
  localStorage.setItem("wp_ig_code",code);
- log("Instagram authorization received. Server token exchange is required before comments can be fetched.");
+ log("Instagram authorization callback received.");
  state.platform="Instagram";save();render();
 }
 function connectInstagramFallback(){
