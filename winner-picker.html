@@ -204,37 +204,17 @@ async function connectInstagram(){
  localStorage.setItem("wp_ig_client_id",client);
  const redirect=location.origin+"/api/instagram/callback";
  const state=Math.random().toString(36).slice(2);
- sessionStorage.setItem("wp_ig_oauth_state",state);
+ sessionStorage.setItem("wp_ig_oauth_state",state);document.cookie="wp_ig_oauth_state="+encodeURIComponent(state)+"; Path=/; SameSite=Lax";
  const scope="instagram_business_basic,instagram_business_manage_comments";
  location.href="https://www.instagram.com/oauth/authorize?client_id="+encodeURIComponent(client)+"&redirect_uri="+encodeURIComponent(redirect)+"&response_type=code&scope="+encodeURIComponent(scope)+"&state="+encodeURIComponent(state);
 }
 async function finishInstagramOAuth(){
- const q=new URLSearchParams(location.search);const s=q.get("instagram_session");
- if(s){sessionStorage.setItem("ig_session",s);history.replaceState(null,"",location.pathname);log("Instagram connected.");}
-
- const q=new URLSearchParams(location.search);const code=q.get("code"),state=q.get("state");
- if(!code||!state||state!==sessionStorage.getItem("wp_ig_oauth_state"))return;
- history.replaceState(null,"",location.pathname);
- localStorage.setItem("wp_ig_code",code);
- log("Instagram authorization callback received.");
- state.platform="Instagram";save();render();
+ const q=new URLSearchParams(location.search);
+ if(q.get("instagram_connected")==="1"){
+  history.replaceState(null,"",location.pathname);
+  state.platform="Instagram";save();render();log("Instagram connected.");
+ }
 }
-async function loadTikTokComments(){
- const id=$("ttVideoId")?.value.trim();if(!id){log("Enter TikTok video ID.");return}
- try{
-  let cursor=0,total=0,all=[];
-  while(true){
-   const r=await fetch("/api/tiktok/comments?video_id="+encodeURIComponent(id)+"&cursor="+cursor);const d=await r.json();
-   if(!r.ok)throw new Error(d.error||"TikTok API error");
-   const x=d.data||{};for(const m of (x.comments||[]))all.push((m.display_name||"user")+": "+(m.text||""));
-   total+=x.comments?.length||0;log("TikTok: loaded "+total+" comments...");
-   if(!x.has_more)break;cursor=x.cursor;if(total>=100000)break;
-  }
-  if(all.length)importComments(all.join("\n"),"TikTok");
-  log("TikTok complete: "+total+" comments loaded.");
- }catch(e){log("TikTok comments error: "+e.message)}
-}
-function importTikTokFallback(){const raw=$("ttComments")?.value||"";if(raw.trim())importComments(raw,"TikTok")}
 function connectInstagramFallback(){
  const raw=$("igComments")?.value||"";if(!raw.trim())return;
  importComments(raw,"Instagram");
