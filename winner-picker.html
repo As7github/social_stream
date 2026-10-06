@@ -276,14 +276,14 @@ if(!name)continue;if(keyword&&!comment.toLowerCase().includes(keyword))continue;
 if(one&&seen.has(name.toLowerCase()))continue;
 state.people.push({name,role:"Viewer",weight:state.settings.Viewer});seen.add(name.toLowerCase());added++;
 }
-$("commentInput").value="";save();log("Imported "+added+" entries from "+state.platform);
+$("commentInput").value="";save();queueParticipantSync();log("Imported "+added+" entries from "+state.platform);
 }
 function setRoundStatus(v){state.status=v;save()}
 function setPlatform(p){state.platform=p;save()}
-function newGiveaway(){state.status="open";state.name=$("giveawayName").value.trim()||"Untitled giveaway";state.people=[];$("result").innerHTML="";save()}
+function newGiveaway(){state.status="open";state.name=$("giveawayName").value.trim()||"Untitled giveaway";state.people=[];state.giveawayId=crypto.randomUUID();$("result").innerHTML="";save();queueParticipantSync()}
 function addPerson(name,role,weight){name=(name||"").trim();if(!name||state.status==="closed")return;role=role||$("role").value;weight=Math.max(1,+weight||state.settings[role]||1);let old=state.people.find(p=>p.name.toLowerCase()===name.toLowerCase());if(old){old.role=role;old.weight=weight}else state.people.push({name,role,weight});save();queueParticipantSync()}
 function manualAdd(){addPerson($("name").value,$("role").value,$("manualWeight").value);$("name").value=""}
-function bulkAdd(){if(state.status==="closed")return; const role=$("role").value||"Viewer"; $("bulk").value.split(/\n|,|;/).map(x=>x.trim()).filter(Boolean).forEach(n=>{if(!state.people.some(p=>p.name.toLowerCase()===n.toLowerCase()))state.people.push({name:n,role,weight:state.settings[role]||1})});$("bulk").value="";save()}
+function bulkAdd(){if(state.status==="closed")return; const role=$("role").value||"Viewer"; $("bulk").value.split(/\n|,|;/).map(x=>x.trim()).filter(Boolean).forEach(n=>{if(!state.people.some(p=>p.name.toLowerCase()===n.toLowerCase()))state.people.push({name:n,role,weight:state.settings[role]||1})});$("bulk").value="";save();queueParticipantSync()}
 function removePerson(i){state.people.splice(i,1);save();queueParticipantSync()}
 function clearParticipants(){if(confirm("Clear all participants?")){state.people=[];save();queueParticipantSync()}}
 function secureRandom(){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296}
@@ -312,7 +312,7 @@ ws.onerror=()=>log("EventSub WebSocket error");ws.onclose=()=>log("EventSub WebS
 async function handleChat(ev){
 let cmd=(state.settings.ticketCommand||"!ticket").toLowerCase();if((ev.message.text||"").trim().toLowerCase().split(/\s+/)[0]!==cmd)return;
 let role="Viewer",weight=state.settings.Viewer||1;try{let q="https://api.twitch.tv/helix/subscriptions?broadcaster_id="+encodeURIComponent(twitch.user.id)+"&user_id="+encodeURIComponent(ev.chatter_user_id);let d=await twitchFetch(q);if(d.data&&d.data[0]){let tier=d.data[0].tier;role=tier==="3000"?"Tier 3":tier==="2000"?"Tier 2":"Tier 1";weight=state.settings[role]||weight}}catch(e){log("Tier lookup failed for "+ev.chatter_user_name+": "+e.message)}
-if(!state.people.some(p=>p.name.toLowerCase()===ev.chatter_user_name.toLowerCase())){state.people.push({name:ev.chatter_user_name,role,weight});save();log("Ticket: "+ev.chatter_user_name+" ["+role+" ×"+weight+"]")}else log("Duplicate ticket ignored: "+ev.chatter_user_name)}
+if(!state.people.some(p=>p.name.toLowerCase()===ev.chatter_user_name.toLowerCase())){state.people.push({name:ev.chatter_user_name,role,weight});save();queueParticipantSync();log("Ticket: "+ev.chatter_user_name+" ["+role+" ×"+weight+"]")}else log("Duplicate ticket ignored: "+ev.chatter_user_name)}
 function disconnectTwitch(){if(ytTimer)clearTimeout(ytTimer);if(ws)try{ws.close()}catch(e){}ws=null;twitch={token:"",user:null,subs:{}};sessionStorage.removeItem("wp_twitch_token");render();log("Disconnected")}
 finishTwitch().then(()=>finishYouTubeOAuth()).then(()=>finishInstagramOAuth()).then(()=>{render();loadRemote()});
 </script>
