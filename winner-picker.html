@@ -59,7 +59,8 @@ de:{title:"Giveaway-Dashboard",importTitle:"Kommentar-/Chat-Import",onePerUser:"
 ru:{title:"Панель розыгрыша",importTitle:"Импорт комментариев / чата",onePerUser:"Один участник на пользователя",importComments:"Импортировать участников",importHint:"Формат: username: комментарий, username — комментарий или один username в строке.",roundStatus:"Статус",subtitle:"Участники, веса билетов и победители в одном месте.",connection:"Подключение платформы",connect:"Подключить Twitch",disconnect:"Отключить",giveaway:"Розыгрыш",new:"Новый розыгрыш",participants:"Участники",tickets:"Всего билетов",rounds:"Розыгрыши",add:"Добавить",addList:"Добавить список",clear:"Очистить",user:"Пользователь",role:"Роль",weight:"Вес",settings:"Настройки выбора",ticketCommand:"Команда билета Twitch",winnerCount:"Количество победителей",exclude:"Исключать прошлых победителей",draw:"Выбрать победителя",history:"История"}};
 let state=JSON.parse(localStorage.getItem("winnerPicker")||"null")||{platform:"Twitch",name:"",status:"open",people:[],history:[],settings:{Viewer:1,"Tier 1":2,"Tier 2":5,"Tier 3":10,ticketCommand:"!ticket"}};
 state.workspaceId=state.workspaceId||crypto.randomUUID();
-state.giveawayId=state.giveawayId||crypto.randomUUID();\nif(!["Twitch","YouTube","Instagram"].includes(state.platform))state.platform="Twitch";
+state.giveawayId=state.giveawayId||crypto.randomUUID();
+if(!["Twitch","YouTube","Instagram"].includes(state.platform))state.platform="Twitch";
 let remoteReady=false,remoteTimer=null;
 let lang=localStorage.getItem("winnerLang")||"en";let ws=null;let twitch={token:sessionStorage.getItem("wp_twitch_token")||"",user:null,subs:{}};
 const $=id=>document.getElementById(id);
