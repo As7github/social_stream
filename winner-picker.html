@@ -59,7 +59,7 @@ de:{title:"Giveaway-Dashboard",importTitle:"Kommentar-/Chat-Import",onePerUser:"
 ru:{title:"Панель розыгрыша",importTitle:"Импорт комментариев / чата",onePerUser:"Один участник на пользователя",importComments:"Импортировать участников",importHint:"Формат: username: комментарий, username — комментарий или один username в строке.",roundStatus:"Статус",subtitle:"Участники, веса билетов и победители в одном месте.",connection:"Подключение платформы",connect:"Подключить Twitch",disconnect:"Отключить",giveaway:"Розыгрыш",new:"Новый розыгрыш",participants:"Участники",tickets:"Всего билетов",rounds:"Розыгрыши",add:"Добавить",addList:"Добавить список",clear:"Очистить",user:"Пользователь",role:"Роль",weight:"Вес",settings:"Настройки выбора",ticketCommand:"Команда билета Twitch",winnerCount:"Количество победителей",exclude:"Исключать прошлых победителей",draw:"Выбрать победителя",history:"История"}};
 let state=JSON.parse(localStorage.getItem("winnerPicker")||"null")||{platform:"Twitch",name:"",status:"open",people:[],history:[],settings:{Viewer:1,"Tier 1":2,"Tier 2":5,"Tier 3":10,ticketCommand:"!ticket"}};
 state.workspaceId=state.workspaceId||crypto.randomUUID();
-state.giveawayId=state.giveawayId||crypto.randomUUID();
+state.giveawayId=state.giveawayId||crypto.randomUUID();\nif(!["Twitch","YouTube","Instagram"].includes(state.platform))state.platform="Twitch";
 let remoteReady=false,remoteTimer=null;
 let lang=localStorage.getItem("winnerLang")||"en";let ws=null;let twitch={token:sessionStorage.getItem("wp_twitch_token")||"",user:null,subs:{}};
 const $=id=>document.getElementById(id);
@@ -96,7 +96,7 @@ function setLang(x){lang=x;localStorage.setItem("winnerLang",x);render()}
 function saveSettings(){const ids=["wViewer","wTier1","wTier2","wTier3"];["Viewer","Tier 1","Tier 2","Tier 3"].forEach((r,i)=>{const el=$(ids[i]);if(el)state.settings[r]=Math.max(1,+el.value||1)});state.settings.ticketCommand=$("ticketCommand").value.trim()||"!ticket";save()}
 function render(){
 document.documentElement.lang=lang;$("lang").value=lang;document.querySelectorAll("[data-t]").forEach(e=>e.textContent=T[lang][e.dataset.t]||e.textContent);
-$("platforms").innerHTML=["Twitch","YouTube","Instagram","TikTok"].map(p=>'<button class="platform '+(state.platform===p?"active":"")+'" onclick="setPlatform(\''+p+'\')">'+p+"</button>").join("");
+$("platforms").innerHTML=["Twitch","YouTube","Instagram"].map(p=>'<button class="platform '+(state.platform===p?"active":"")+'" onclick="setPlatform(\''+p+'\')">'+p+"</button>").join("");
 $("giveawayName").value=state.name||"";renderRoleSettings();$("ticketCommand").value=state.settings.ticketCommand||"!ticket";
 let total=state.people.reduce((s,p)=>s+p.weight,0);$("count").textContent=state.people.length;$("tickets").textContent=total;$("rounds").textContent=state.history.length;
 const visiblePeople=state.people.slice(0,500);
@@ -132,9 +132,6 @@ $("platformNotice").innerHTML="<b>YouTube:</b> live chat is collected in pages u
 $("platformConfig").innerHTML='<div class="row"><input id="igClientId" class="input grow" placeholder="Meta App ID"><button class="primary" onclick="connectInstagram()">Connect Instagram</button><button onclick="loadInstagramMedia()">Load publications</button></div><div class="row" style="margin-top:8px"><select id="igMediaList" class="input grow"><option value="">Load publications first</option></select><button onclick="loadInstagramComments()">Load comments</button></div><div class="row" style="margin-top:8px"><textarea id="igComments" class="input grow" style="min-height:70px" placeholder="Fallback: paste comments here"></textarea><button onclick="connectInstagramFallback()">Import manually</button></div>';
 $("igClientId").value=localStorage.getItem("wp_ig_client_id")||"";
 $("platformNotice").innerHTML="<b>Instagram:</b> comments are loaded page-by-page, so large posts are not limited to the first 100 comments.";
-}else if(p==="TikTok"){
-$("platformConfig").innerHTML='<div class="row"><input id="ttVideoId" class="input grow" placeholder="TikTok video URL"><button class="primary" onclick="loadTikTokComments()">Load all comments</button></div><div class="row" style="margin-top:8px"><textarea id="ttComments" class="input grow" style="min-height:70px" placeholder="Fallback: paste/export TikTok comments here"></textarea><button onclick="importTikTokFallback()">Import manually</button></div>';
-$("platformNotice").innerHTML="<b>TikTok:</b> paste the public video link. The collector retrieves the public comments, then our picker applies the same giveaway filters and unique-user rule.";
 }else{
 $("platformConfig").innerHTML='<div class="connection"><b>'+p+'</b></div>';
 $("platformNotice").textContent="";
@@ -219,34 +216,6 @@ function connectInstagramFallback(){
  const raw=$("igComments")?.value||"";if(!raw.trim())return;
  importComments(raw,"Instagram");
 }
-function importTikTokFallback(){const raw=$("ttComments")?.value||"";if(!raw.trim())return;importComments(raw,"TikTok");}
-let ttTimer=null;
-async function loadTikTokComments(){
- const video=$("ttVideoId")?.value.trim();if(!video){alert("Paste the public TikTok video URL first.");return}
- if(ttTimer)clearInterval(ttTimer);
- try{
-  log("TikTok: starting comment collection...");
-  const r=await fetch("/api/tiktok/comments?action=start&video_url="+encodeURIComponent(video));
-  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Could not start TikTok collection");
-  const runId=d.run_id;if(!runId)throw new Error("TikTok collector did not return a run ID");
-  let lastStatus="";
-  const check=async()=>{
-   try{
-    const sr=await fetch("/api/tiktok/comments?action=status&run_id="+encodeURIComponent(runId));
-    const sd=await sr.json().catch(()=>({}));if(!sr.ok)throw new Error(sd.error||"TikTok status error");
-    if(sd.status!==lastStatus){lastStatus=sd.status;log("TikTok: "+sd.status)}
-    if(sd.ready){
-     clearInterval(ttTimer);ttTimer=null;
-     const all=(sd.comments||[]).map(x=>(x.username||"user")+": "+(x.text||""));
-     if(all.length)importComments(all.join("\n"),"TikTok");
-     log("TikTok complete: "+all.length+" comments loaded.");
-    }else if(["FAILED","ABORTED","TIMED-OUT"].includes(sd.status)){clearInterval(ttTimer);ttTimer=null;throw new Error(sd.error||("TikTok collection "+sd.status.toLowerCase()))}
-   }catch(e){clearInterval(ttTimer);ttTimer=null;log("TikTok error: "+e.message)}
-  };
-  await check();if(!ttTimer)ttTimer=setInterval(check,3000);
- }catch(e){log("TikTok error: "+e.message);alert(e.message)}
-}
-
 function disconnectYouTube(){if(ytTimer)clearTimeout(ytTimer);ytTimer=null;ytToken="";ytChatId="";ytChannelId="";sessionStorage.removeItem("wp_yt_token");sessionStorage.removeItem("wp_yt_chat_id");sessionStorage.removeItem("wp_yt_channel_id");log("YouTube disconnected")}
 async function pollYouTubeOAuth(first){
 if(!ytToken||!ytChatId)return;
