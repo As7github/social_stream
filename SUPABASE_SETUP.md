@@ -1,6 +1,6 @@
 # Winner Picker storage setup
 
-The scalable storage layer uses Supabase PostgreSQL. The browser never receives the Supabase service-role key.
+The scalable storage layer uses Supabase PostgreSQL. The browser never receives the Supabase secret key.
 
 ## 1. Database
 Open Supabase SQL Editor and run:
@@ -11,9 +11,9 @@ supabase/schema.sql
 In the hosting project add:
 
 SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_ONLY_SERVICE_ROLE_KEY
+SUPABASE_SECRET_KEY=YOUR_SERVER_ONLY_SERVICE_ROLE_KEY
 
-Never put SUPABASE_SERVICE_ROLE_KEY into winner-picker.html or any browser code.
+Never put SUPABASE_SECRET_KEY into winner-picker.html or any browser code.
 
 ## 3. Capacity model
 Comments/chat messages are converted into unique participants. Participants are stored as rows, not duplicated ticket rows. The storage API reads participants in 1000-row pages and writes them in 500-row batches.
