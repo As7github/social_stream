@@ -1,11 +1,12 @@
 const json=async r=>{try{return await r.json()}catch{return {}}};
-const headers={"Content-Type":"application/json","apikey":process.env.SUPABASE_SERVICE_ROLE_KEY,"Authorization":"Bearer "+process.env.SUPABASE_SERVICE_ROLE_KEY};
+const supabaseKey=process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY;
+const headers={"Content-Type":"application/json","apikey":supabaseKey,"Authorization":"Bearer "+supabaseKey};
 async function sb(path,opts={}){
  const r=await fetch(process.env.SUPABASE_URL+"/rest/v1/"+path,{...opts,headers:{...headers,...(opts.headers||{})}});
  const d=await json(r);if(!r.ok)throw new Error(d.message||d.error||"Supabase error");return d;
 }
 export default async function handler(req,res){
- if(!process.env.SUPABASE_URL||!process.env.SUPABASE_SERVICE_ROLE_KEY)return res.status(500).json({error:"Storage is not configured"});
+ if(!process.env.SUPABASE_URL||!supabaseKey)return res.status(500).json({error:"Storage is not configured"});
  try{
   const body=req.method==="POST"?req.body||{}:{};
   const workspace=String((req.query&&req.query.workspace_id)||body.workspace_id||"").trim(),id=String((req.query&&req.query.giveaway_id)||body.giveaway_id||"").trim();
