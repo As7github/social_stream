@@ -103,7 +103,13 @@ const visiblePeople=state.people.slice(0,500);
 $("people").innerHTML=state.people.length?visiblePeople.map((p,i)=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.role)+'</td><td>'+p.weight+'</td><td><button class="danger" onclick="removePerson('+i+')">×</button></td></tr>').join(""):'<tr><td colspan="4" class="empty">No participants yet</td></tr>';
 if(state.people.length>500)$("people").innerHTML+='<tr><td colspan="4" class="empty">Showing first 500 of '+state.people.length+' participants. All '+state.people.length+' are included in the draw.</td></tr>';
 $("history").innerHTML=state.history.length?state.history.slice().reverse().map(h=>'<div class="history-item"><b>'+esc(h.name)+'</b><div class="muted">'+esc(h.winners.join(", "))+' · '+new Date(h.time).toLocaleString()+'</div></div>').join(""):'<div class="muted">No draws yet</div>';
+if(state.platform==="Twitch"){
 $("connectionBox").innerHTML=twitch.token&&twitch.user?'<div class="connection"><div class="status"><span class="dot on"></span><b>'+esc(twitch.user.display_name||twitch.user.login)+'</b><span class="muted">· Twitch connected</span></div><div class="small muted">'+esc(twitch.user.login)+' · '+twitch.user.id+'</div></div>':'<div class="connection"><div class="status"><span class="dot"></span><span class="muted">Twitch not connected</span></div></div>';
+}else if(state.platform==="YouTube"){
+$("connectionBox").innerHTML='<div class="connection"><div class="status"><span class="dot '+(ytToken||ytChatId?"on":"")+'"></span><span class="muted">'+(ytToken||ytChatId?"YouTube configured":"YouTube not connected")+'</span></div></div>';
+}else{
+$("connectionBox").innerHTML='<div class="connection"><div class="status"><span class="dot"></span><span class="muted">Instagram connection is managed securely after authorization.</span></div></div>';
+}
 renderPlatformConfig();renderRoleSettings();
 $("roundStatus").value=state.status||"open";$("statusHint").textContent=(state.status||"open")==="open"?"Entries can be added.":"Entries are closed.";}
 function renderRoleSettings(){
@@ -223,7 +229,7 @@ try{
  for(const m of (d.items||[])){
   const type=m.snippet?.type,name=m.authorDetails?.displayName||m.snippet?.authorChannelId;if(!name)continue;
   let role="Viewer",weight=state.settings.Viewer||1;
-  if(m.authorDetails?.isChatModerator||m.authorDetails?.isChatOwner||m.authorDetails?.isChatSponsor)role="Member";
+  if(m.authorDetails?.isChatSponsor)role="Member";
   if(type==="textMessageEvent"){
    const text=m.snippet.textMessageDetails?.messageText||"",cmd=(state.settings.ticketCommand||"!ticket").toLowerCase();
    if(text.trim().toLowerCase().split(/\s+/)[0]!==cmd)continue;
@@ -248,7 +254,7 @@ for(const m of (d.items||[])){
 const type=m.snippet?.type;
 const name=m.authorDetails?.displayName||m.snippet?.authorChannelId;if(!name)continue;
 let role="Viewer",weight=state.settings.Viewer||1;
-if(m.authorDetails?.isChatModerator||m.authorDetails?.isChatOwner)role="Member";
+if(m.authorDetails?.isChatSponsor)role="Member";
 if(m.snippet?.memberMilestoneChatDetails?.memberLevelName)role="Member";
 if(m.snippet?.newSponsorDetails?.memberLevelName)role="Member";
 if(type==="textMessageEvent"){
