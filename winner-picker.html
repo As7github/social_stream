@@ -169,13 +169,11 @@ const key=$("ytApiKey").value.trim(),chat=$("ytChatId").value.trim();if(!key||!c
 localStorage.setItem("wp_yt_api_key",key);localStorage.setItem("wp_yt_chat_id",chat);state.platform="YouTube";render();log("YouTube chat connected");pollYouTube(true);
 }
 async function loadInstagramMedia(){
- const raw=sessionStorage.getItem("ig_session");
- if(!raw){log("Connect Instagram first.");return}
  try{
-  const s=JSON.parse(atob(raw)); const r=await fetch("/api/instagram/media?limit=50",{headers:{Authorization:"Bearer "+s.access_token}});
-  const d=await r.json(); if(!r.ok)throw new Error(d.error||"Could not load media");
+  const r=await fetch("/api/instagram/media?limit=50");
+  const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.error?.message||d.error||"Could not load media");
   const box=$("igMediaList"); if(!box)return;
-  box.innerHTML=(d.data||[]).map(x=>'<option value="'+x.id+'">'+escapeHtml((x.caption||"Untitled").slice(0,90))+' — '+(x.timestamp||"")+'</option>').join("");
+  box.innerHTML=(d.data||[]).map(x=>'<option value="'+esc(x.id)+'">'+esc((x.caption||"Untitled").slice(0,90))+' — '+esc(x.timestamp||"")+'</option>').join("");
   log("Instagram publications loaded: "+(d.data||[]).length);
  }catch(e){log("Instagram media error: "+e.message)}
 }
@@ -265,17 +263,20 @@ localStorage.setItem("winnerPicker",JSON.stringify(state));render();
 ytTimer=setTimeout(()=>pollYouTube(false),Math.max(1000,+(d.pollingIntervalMillis||5000)));
 }catch(e){log("YouTube ERROR: "+e.message);ytTimer=setTimeout(()=>pollYouTube(false),7000)}
 }
-function importComments(){
-const raw=$("commentInput").value.trim();if(!raw)return;
+function importComments(input,source){
+const fromBox=typeof input!=="string",raw=(fromBox?$("commentInput").value:input).trim();if(!raw)return;
 const keyword=$("keywordFilter").value.trim().toLowerCase(),minWords=Math.max(0,+$("minWords").value||0),one=$("onePerUser").checked;
 const seen=new Set(state.people.map(p=>p.name.toLowerCase()));let added=0;
+const role=(state.platform==="Twitch"||state.platform==="YouTube")?"Viewer":"Participant";
+const weight=state.settings[role]||1;
 for(const line of raw.split(/\r?\n/)){let s=line.trim();if(!s)continue;
 let parts=s.match(/^([^:—-]{1,80})\s*[:—-]\s*(.*)$/),name=(parts?parts[1]:s).trim(),comment=(parts?parts[2]:s).trim();
 if(!name)continue;if(keyword&&!comment.toLowerCase().includes(keyword))continue;if(comment&&comment.split(/\s+/).filter(Boolean).length<minWords)continue;
 if(one&&seen.has(name.toLowerCase()))continue;
-state.people.push({name,role:"Viewer",weight:state.settings.Viewer});seen.add(name.toLowerCase());added++;
+state.people.push({name,role,weight});seen.add(name.toLowerCase());added++;
 }
-$("commentInput").value="";save();queueParticipantSync();log("Imported "+added+" entries from "+state.platform);
+if(fromBox)$("commentInput").value="";
+save();queueParticipantSync();log("Imported "+added+" entries from "+(source||state.platform));
 }
 function setRoundStatus(v){state.status=v;save()}
 function setPlatform(p){state.platform=p;save()}
@@ -312,7 +313,7 @@ async function handleChat(ev){
 let cmd=(state.settings.ticketCommand||"!ticket").toLowerCase();if((ev.message.text||"").trim().toLowerCase().split(/\s+/)[0]!==cmd)return;
 let role="Viewer",weight=state.settings.Viewer||1;try{let q="https://api.twitch.tv/helix/subscriptions?broadcaster_id="+encodeURIComponent(twitch.user.id)+"&user_id="+encodeURIComponent(ev.chatter_user_id);let d=await twitchFetch(q);if(d.data&&d.data[0]){let tier=d.data[0].tier;role=tier==="3000"?"Tier 3":tier==="2000"?"Tier 2":"Tier 1";weight=state.settings[role]||weight}}catch(e){log("Tier lookup failed for "+ev.chatter_user_name+": "+e.message)}
 if(!state.people.some(p=>p.name.toLowerCase()===ev.chatter_user_name.toLowerCase())){state.people.push({name:ev.chatter_user_name,role,weight});save();queueParticipantSync();log("Ticket: "+ev.chatter_user_name+" ["+role+" ×"+weight+"]")}else log("Duplicate ticket ignored: "+ev.chatter_user_name)}
-function disconnectTwitch(){if(ytTimer)clearTimeout(ytTimer);if(ws)try{ws.close()}catch(e){}ws=null;twitch={token:"",user:null,subs:{}};sessionStorage.removeItem("wp_twitch_token");render();log("Disconnected")}
+function disconnectTwitch(){if(ws)try{ws.close()}catch(e){}ws=null;twitch={token:"",user:null,subs:{}};sessionStorage.removeItem("wp_twitch_token");render();log("Disconnected")}
 finishTwitch().then(()=>finishYouTubeOAuth()).then(()=>finishInstagramOAuth()).then(()=>{render();loadRemote()});
 </script>
 </body></html>
